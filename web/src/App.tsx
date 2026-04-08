@@ -1,11 +1,10 @@
 import './App.css'
+import Entrar from "./pages/Entrar";
 
 function App() {
 
   return (
-    <>
-      <h1 className="text-2xl">Hello world</h1>
-    </>
+    <Entrar />
   )
 }
 
