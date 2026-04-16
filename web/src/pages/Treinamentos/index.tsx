@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button, Input, Card } from "@heroui/react";
 
 interface Training {
@@ -78,6 +79,7 @@ const trainingsMock: Training[] = [
 type StatusFilter = "todos" | "em-andamento" | "concluido" | "oculto";
 
 export const Treinamentos = () => {
+    const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedStatus, setSelectedStatus] = useState<StatusFilter>("todos");
 
@@ -149,21 +151,6 @@ export const Treinamentos = () => {
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="bg-white"
-                        startContent={
-                            <svg
-                                className="w-5 h-5 text-neutral-400"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                                />
-                            </svg>
-                        }
                     />
                 </div>
                 <Button className="bg-primary text-white font-semibold px-6 flex items-center gap-2">
@@ -237,7 +224,8 @@ export const Treinamentos = () => {
                     return (
                         <Card
                             key={training.id}
-                            className="overflow-hidden shadow-md hover:shadow-lg transition-shadow rounded-2xl"
+                            className="overflow-hidden shadow-md hover:shadow-lg transition-shadow rounded-2xl cursor-pointer"
+                            onClick={() => navigate(`/painel/treinamentos/${training.id}`)}
                         >
                             {/* Imagem/Header azul */}
                             <div className="w-full h-40 bg-gradient-to-br from-primary-200 to-primary-400 relative flex items-start justify-end p-4">
