@@ -3,6 +3,7 @@ import './App.css';
 import Template from "./components/Template";
 import Login from "./pages/Login";
 import { MyProfile } from "./pages/MyProfile";
+import { Treinamentos } from "./pages/Treinamentos";
 
 function App() {
 
@@ -14,7 +15,7 @@ function App() {
           <Route index element={<>Início</>} />
           <Route path="meu-perfil" element={<MyProfile />} />
           <Route path="colaboradores" element={<>Colaboradores</>} />
-          <Route path="treinamentos" element={<>Treinamentos</>} />
+          <Route path="treinamentos" element={<Treinamentos />} />
           <Route path="gerenciar-treinamentos" element={<>Gerenciar Treinamentos</>} />
         </Route>
       </Routes>
