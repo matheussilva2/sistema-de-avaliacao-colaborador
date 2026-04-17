@@ -5,10 +5,12 @@ import Login from "./pages/Login";
 import { MyProfile } from "./pages/MyProfile";
 import { Treinamentos } from "./pages/Treinamentos";
 import { DetalhesTrainamento } from "./pages/DetalhesTrainamento";
+import { AuthProvider } from "./providers/AuthProvider";
 
 function App() {
 
   return (
+    <AuthProvider>
     <BrowserRouter>
       <Routes>
         <Route index element={<Login />} />
@@ -22,6 +24,7 @@ function App() {
         </Route>
       </Routes>
     </BrowserRouter>
+    </AuthProvider>
   )
 }
 
