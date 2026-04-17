@@ -8,6 +8,7 @@ export default function Login() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [isLoading, setIsLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState("");
 
     const { user, loading, login } = useAuth();
 
@@ -15,13 +16,20 @@ export default function Login() {
         if(user && !loading) {
             navigate('/painel');
         }
-    }, [loading]);
+    }, [user, loading]);
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
+        const loginSuccessfully = login(email, password);
         
-        login(email, password);
+        if(!loginSuccessfully){
+            setErrorMessage("Credenciais inválidas.");
+
+            setTimeout(() => {
+                setErrorMessage("");
+            }, 5000);
+        }
 
         setIsLoading(false);
     };
@@ -70,6 +78,10 @@ export default function Login() {
                             />
                         </div>
 
+                        <div className="py-1">
+                            <p className="text-danger">{errorMessage}</p>
+                        </div>
+
                         <Button
                             type="submit"
                             className="w-full bg-primary text-white font-semibold py-2 rounded-lg hover:bg-primary-600 transition-colors duration-200"
@@ -82,9 +94,7 @@ export default function Login() {
                     <div className="mt-6 pt-6 border-t border-neutral-200">
                         <p className="text-center text-neutral-600 text-xs">
                             Caso tenha esquecido a senha,{" "}
-                            <a href="#" className="text-primary font-semibold hover:text-primary-600">
-                                entre em contato
-                            </a>
+                            entre em contato com a administração
                         </p>
                     </div>
                 </div>
