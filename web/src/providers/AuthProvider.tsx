@@ -44,7 +44,7 @@ export const AuthProvider = ({children} : {children: React.ReactNode}) => {
         setLoading(false);
     }, []);
 
-    const login = async(email: string, pass: string) => {
+    const login = (email: string, pass: string) => {
         setLoading(true);
 
         const data = USERS_MOCK.find(item => item.email === email && item.password === pass);
@@ -54,11 +54,13 @@ export const AuthProvider = ({children} : {children: React.ReactNode}) => {
             setUser(result);
             
             localStorage.setItem('capacitanees@user', JSON.stringify(data));
+            setLoading(false);
+            return true;
         } else {
-            throw new Error('Credenciais inválidas');
+            setLoading(false);
+            return false;
         }
 
-        setLoading(false);
     }
 
     const logout = () => {
