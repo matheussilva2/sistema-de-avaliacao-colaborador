@@ -1,5 +1,7 @@
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { MenuItem } from "./components/MenuItem";
+import { useAuth } from "../../providers/AuthProvider";
+import { useEffect } from "react";
 
 type TemplateGestorProps = {
     titulo: string;
@@ -7,33 +9,9 @@ type TemplateGestorProps = {
 
 export default function({ titulo }: TemplateGestorProps) {
     const {pathname} = useLocation();
+    const navigate = useNavigate();
 
-    const menuItemsAdmin = [
-        {
-            label: "Início",
-            link: "/painel"
-        },
-        {
-            label: "Meu Perfil",
-            link: "/painel/meu-perfil"
-        },
-        {
-            label: "Colaboradores",
-            link: "/painel/colaboradores"
-        },
-        {
-            label: "Treinamentos",
-            link: "/painel/treinamentos"
-        },
-        {
-            label: "Gerenciar Treinamento",
-            link: "/painel/gerenciar-treinamentos"
-        },
-        {
-            label: "Sair",
-            link: "/painel/sair"
-        },
-    ];
+    const {user, loading, logout} = useAuth();
 
     const menuItems = [
         {
@@ -45,14 +23,26 @@ export default function({ titulo }: TemplateGestorProps) {
             link: "/painel/meu-perfil"
         },
         {
+            label: "Colaboradores",
+            link: "/painel/colaboradores",
+            permission: "manage_users"
+        },
+        {
             label: "Treinamentos",
             link: "/painel/treinamentos"
         },
         {
-            label: "Sair",
-            link: "/painel/sair"
-        },
+            label: "Gerenciar Treinamento",
+            link: "/painel/gerenciar-treinamentos",
+            permission: "manage_trainings"
+        }
     ];
+
+    useEffect(() => {
+        if(!user && !loading) {
+            navigate('/');
+        }
+    }, [user, loading]);
 
     return (
         <div className="flex">
@@ -64,14 +54,31 @@ export default function({ titulo }: TemplateGestorProps) {
                 </div>
                 <nav className="flex flex-col gap-1 pt-5">
                     {
-                        menuItems.map((item) => (
-                            <MenuItem
-                                link={item.link}
-                                label={item.label}
-                                isActive={pathname === item.link}
-                            />
-                        ))
+                        menuItems.map((item) => {
+                            if(item.permission) {
+                                if(user?.permissoes.includes(item.permission)){
+                                    return <MenuItem
+                                            link={item.link}
+                                            label={item.label}
+                                            isActive={pathname === item.link}
+                                        />
+                                }
+                            } else {
+                                return <MenuItem
+                                            link={item.link}
+                                            label={item.label}
+                                            isActive={pathname === item.link}
+                                        />;
+                            }
+                        })
                     }
+                    <button
+                        className={
+                            `w-full h-12 px-5 bg-white text-gray-950 text-left cursor-pointer`
+                        }
+                        onClick={logout}>
+                        <span>Sair</span>
+                    </button>
                 </nav>
             </aside>
             <div className="flex-1">
