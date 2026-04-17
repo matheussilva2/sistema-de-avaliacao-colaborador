@@ -1,29 +1,40 @@
 import { useState } from "react";
 import { Button, Card, Input, Label, Checkbox } from "@heroui/react";
+import type { Permission } from "../../types/Permission";
+
+const permissionsMock: Permission[] = [
+    {
+        name: "manage_trainings",
+        label: "Gerenciar Treinamentos",
+        isEnabled: true
+    },
+    {
+        name: "manage_users",
+        label: "Gerenciar usuários",
+        isEnabled: false
+    }
+];
 
 export const MyProfile = () => {
     const [isEditing, setIsEditing] = useState(false);
-    const [permissions, setPermissions] = useState({
-        viewTrainings: true,
-        createTrainings: false,
-        reportUsers: false,
-        manageTrainings: false,
-    });
+    const [permissions, setPermissions] = useState<Permission[]>(permissionsMock);
 
-    const handlePermissionChange = (key: keyof typeof permissions) => {
-        setPermissions(prev => ({
-            ...prev,
-            [key]: !prev[key]
-        }));
+    const handlePermissionChange = (permissionName: string) => {
+        const updatedPermissions = permissions.map(permission => {
+            if(permission.name === permissionName) {
+                return { ...permission, isEnabled: !permission.isEnabled }
+            }
+            return permission;
+        });
+        
+        setPermissions(updatedPermissions);
     };
 
     return (
         <div className="p-8 bg-neutral-50 min-h-screen">
-            {/* Profile Section */}
             <div className="flex gap-6 mb-8">
-                {/* Left: Profile Card */}
-                <div className="w-64 flex-shrink-0">
-                    <Card className="bg-primary-50 rounded-xl shadow-md overflow-hidden">
+                <div className="w-64">
+                    <Card className="bg-primary-50 rounded-xl shadow-md overflow-hidden p-0">
                         <div className="p-6 flex flex-col items-center gap-4">
                             <img
                                 width={80}
@@ -51,88 +62,134 @@ export const MyProfile = () => {
                                 <span className="block text-primary-700 text-lg font-bold">Ana Maria</span>
                                 <span className="block text-neutral-600 text-sm">Analista de Dados</span>
                             </div>
-
-                            <Button className="w-full bg-primary text-white font-semibold">
-                                Editar
-                            </Button>
                         </div>
                     </Card>
                 </div>
 
-                {/* Right: Dados Pessoais */}
                 <div className="flex-1">
-                    <Card className="rounded-xl shadow-md overflow-hidden">
+                    <Card className="rounded-xl shadow-md overflow-hidden p-0 gap-0">
                         <div className="bg-primary p-4 border-b-4 border-primary">
                             <span className="text-white font-semibold text-base">Dados Pessoais</span>
                         </div>
                         <div className="bg-primary-50 p-6">
                             <form className="grid grid-cols-2 gap-4">
                                 <div className="flex flex-col gap-2">
-                                    <Label className="text-primary-700 font-semibold text-sm">Nome</Label>
+                                    <Label
+                                        htmlFor="profile_nome_input"
+                                        className="text-primary-700 font-semibold text-sm">
+                                            Nome
+                                    </Label>
                                     <Input
                                         type="text"
-                                        placeholder="Ana Maria"
+                                        placeholder="Digite seu nome"
                                         className="bg-white"
                                         disabled={!isEditing}
+                                        value="Ana Maria"
+                                        name="nome"
+                                        id="profile_nome_input"
                                     />
                                 </div>
                                 <div className="flex flex-col gap-2">
-                                    <Label className="text-primary-700 font-semibold text-sm">Sobrenome</Label>
+                                    <Label
+                                        htmlFor="profile_sobrenome_input"
+                                        className="text-primary-700 font-semibold text-sm">
+                                            Sobrenome
+                                    </Label>
                                     <Input
                                         type="text"
-                                        placeholder="dos Santos"
+                                        placeholder="Digite seu sobrenome"
                                         className="bg-white"
                                         disabled={!isEditing}
+                                        value="dos Santos"
+                                        name="sobrenome"
+                                        id="profile_sobrenome_input"
                                     />
                                 </div>
                                 <div className="flex flex-col gap-2">
-                                    <Label className="text-primary-700 font-semibold text-sm">E-mail</Label>
+                                    <Label
+                                        htmlFor="profile_email_input"
+                                        className="text-primary-700 font-semibold text-sm">
+                                            E-mail
+                                    </Label>
                                     <Input
                                         type="email"
-                                        placeholder="ana.santos@ufal.br"
+                                        placeholder="Digite seu e-mail"
                                         className="bg-white"
                                         disabled={!isEditing}
+                                        value="ana.santos@ufal.br"
+                                        name="email"
+                                        id="profile_email_input"
                                     />
                                 </div>
                                 <div className="flex flex-col gap-2">
-                                    <Label className="text-primary-700 font-semibold text-sm">Telefone</Label>
+                                    <Label
+                                        htmlFor="profile_telefone_input"
+                                        className="text-primary-700 font-semibold text-sm">
+                                            Telefone
+                                    </Label>
                                     <Input
                                         type="tel"
-                                        placeholder="(82) 9999-9999"
+                                        placeholder="(XX) XXXXX-XXXX"
                                         className="bg-white"
                                         disabled={!isEditing}
+                                        value="(82) 99999-9999"
+                                        name="telefone"
+                                        id="profile_telefone_input"
                                     />
                                 </div>
                                 <div className="flex flex-col gap-2">
-                                    <Label className="text-primary-700 font-semibold text-sm">E-mail Profissional</Label>
-                                    <Input
-                                        type="email"
-                                        placeholder="anamaria@nees.ufal.br"
-                                        className="bg-white"
-                                        disabled={!isEditing}
-                                    />
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    <Label className="text-primary-700 font-semibold text-sm">Seguir a nova senha</Label>
+                                    <Label
+                                        htmlFor="profile_password_input"
+                                        className="text-primary-700 font-semibold text-sm">
+                                            Alterar Senha
+                                    </Label>
                                     <Input
                                         type="text"
                                         placeholder="Nova senha"
                                         className="bg-white"
                                         disabled={!isEditing}
+                                        name="password"
+                                        id="profile_password_input"
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-2">
+                                    <Label
+                                        htmlFor="profile_repassword_input"
+                                        className="text-primary-700 font-semibold text-sm">
+                                            Confirmar Senha
+                                    </Label>
+                                    <Input
+                                        type="text"
+                                        placeholder="Confirme a senha"
+                                        className="bg-white"
+                                        disabled={!isEditing}
+                                        name="password_confirmation"
+                                        id="profile_repassword_input"
                                     />
                                 </div>
                             </form>
 
-                            <Button className="w-full bg-primary text-white font-semibold mt-6">
-                                Salvar Alterações
-                            </Button>
+                            {
+                                isEditing ? (
+                                    <Button
+                                        onPress={() => setIsEditing(false)}
+                                        className="w-full bg-primary text-white font-semibold mt-6">
+                                        Salvar Alterações
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        onPress={() => setIsEditing(true)}
+                                        className="w-full bg-primary text-white font-semibold mt-6">
+                                        Editar Dados
+                                    </Button>
+                                )
+                            }
                         </div>
                     </Card>
                 </div>
             </div>
 
-            {/* Cargos e Permissões Section */}
-            <Card className="rounded-xl shadow-md overflow-hidden">
+            <Card className="rounded-xl shadow-md overflow-hidden p-0 gap-0">
                 <div className="bg-primary p-4">
                     <span className="text-white font-semibold text-base">Cargos e Permissões</span>
                 </div>
@@ -153,38 +210,28 @@ export const MyProfile = () => {
                     <div className="mt-6">
                         <h3 className="text-primary-700 font-semibold text-sm mb-4">Permissões</h3>
                         <div className="flex flex-col gap-3">
-                            <div className="flex items-center gap-2">
-                                <Checkbox
-                                    isSelected={permissions.viewTrainings}
-                                    onChange={() => handlePermissionChange('viewTrainings')}
-                                    color="primary"
-                                />
-                                <span className="text-neutral-700">Ver Treinamentos</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Checkbox
-                                    isSelected={permissions.createTrainings}
-                                    onChange={() => handlePermissionChange('createTrainings')}
-                                    color="primary"
-                                />
-                                <span className="text-neutral-700">Criar Treinamentos</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Checkbox
-                                    isSelected={permissions.reportUsers}
-                                    onChange={() => handlePermissionChange('reportUsers')}
-                                    color="primary"
-                                />
-                                <span className="text-neutral-700">Denunciar Usuários</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Checkbox
-                                    isSelected={permissions.manageTrainings}
-                                    onChange={() => handlePermissionChange('manageTrainings')}
-                                    color="primary"
-                                />
-                                <span className="text-neutral-700">Gerenciar Treinamentos</span>
-                            </div>
+                            {
+                                permissions.map((permission) => (
+                                    <div className="flex items-center gap-2">
+                                        <Checkbox
+                                            id={`permissions_${permission.name}`}
+                                            isSelected={permission.isEnabled}
+                                            onChange={() => handlePermissionChange(permission.name)}
+                                        >
+                                            <Checkbox.Control
+                                            >
+                                                <Checkbox.Indicator />
+                                            </Checkbox.Control>
+                                        </Checkbox>
+                                        <label
+                                            htmlFor={`permissions_${permission.name}`}
+                                            className="text-gray-700 cursor-pointer"
+                                        >
+                                            {permission.label}
+                                        </label>
+                                    </div>
+                                ))
+                            }
                         </div>
                     </div>
                 </div>
