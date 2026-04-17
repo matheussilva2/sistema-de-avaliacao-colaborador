@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Input, Card } from "@heroui/react";
+import { useAuth } from "../../providers/AuthProvider";
 
 export default function Login() {
     const navigate = useNavigate();
@@ -8,16 +9,21 @@ export default function Login() {
     const [password, setPassword] = useState("");
     const [isLoading, setIsLoading] = useState(false);
 
+    const { user, loading, login } = useAuth();
+
+    useEffect(() => {
+        if(user && !loading) {
+            navigate('/painel');
+        }
+    }, [loading]);
+
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
         
-        // Simular delay de login
-        setTimeout(() => {
-            // Redirecionar para a página de perfil
-            navigate("/painel/meu-perfil");
-            setIsLoading(false);
-        }, 500);
+        login(email, password);
+
+        setIsLoading(false);
     };
 
     return (
@@ -67,7 +73,7 @@ export default function Login() {
                         <Button
                             type="submit"
                             className="w-full bg-primary text-white font-semibold py-2 rounded-lg hover:bg-primary-600 transition-colors duration-200"
-                            disabled={isLoading}
+                            isDisabled={isLoading}
                         >
                             {isLoading ? "Entrando..." : "Entrar"}
                         </Button>
