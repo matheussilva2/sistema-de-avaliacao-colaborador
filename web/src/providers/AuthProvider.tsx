@@ -33,7 +33,7 @@ const AuthContext = createContext<AuthContextData>({} as AuthContextData);
 
 export const AuthProvider = ({children} : {children: React.ReactNode}) => {
     const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const storedUser = localStorage.getItem('capacitanees@user');
@@ -44,14 +44,14 @@ export const AuthProvider = ({children} : {children: React.ReactNode}) => {
         setLoading(false);
     }, []);
 
-    const login = async({email, pass} : { email: string, pass: string}) => {
+    const login = async(email: string, pass: string) => {
         setLoading(true);
 
-        const result = USERS_MOCK.find(item => item.email === email && item.password === pass);
+        const data = USERS_MOCK.find(item => item.email === email && item.password === pass);
 
-        if(result) {
-            const data = { password, ...result};
-            setUser(data);
+        if(data) {
+            const { password, ...result} = data;
+            setUser(result);
             
             localStorage.setItem('capacitanees@user', JSON.stringify(data));
         } else {
@@ -66,7 +66,7 @@ export const AuthProvider = ({children} : {children: React.ReactNode}) => {
         setUser(null);
     }
 
-    return <AuthContext.Provider user={user} loading={loading} login={login} logout={logout} >
+    return <AuthContext.Provider value={{user, loading, login, logout}}>
         {children}
     </AuthContext.Provider>
 }
