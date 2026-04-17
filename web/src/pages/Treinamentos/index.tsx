@@ -1,28 +1,18 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { Button, Input, Card } from "@heroui/react";
-
-interface Training {
-    id: number;
-    title: string;
-    hours: number;
-    progress: number;
-    startDate: string;
-    endDate: string;
-    daysLeft: number;
-    status: "em-andamento" | "concluido" | "avaliacao" | "pre-avaliacao" | "breve" | "pendencias";
-}
+import type { Training } from "../../types/Training";
 
 const trainingsMock: Training[] = [
     {
         id: 1,
         title: "LGPD e Proteção de Dados",
         hours: 72,
-        progress: 40,
+        progress: 10,
         startDate: "20/05",
         endDate: "30/06",
         daysLeft: 5,
-        status: "em-andamento",
+        status: "em_andamento",
     },
     {
         id: 2,
@@ -38,11 +28,11 @@ const trainingsMock: Training[] = [
         id: 3,
         title: "Lorem ipsum dolor",
         hours: 72,
-        progress: 100,
+        progress: 15,
         startDate: "20/05",
         endDate: "30/06",
         daysLeft: 0,
-        status: "pre-avaliacao",
+        status: "pre_avaliacao",
     },
     {
         id: 4,
@@ -52,7 +42,7 @@ const trainingsMock: Training[] = [
         startDate: "20/05",
         endDate: "30/06",
         daysLeft: 15,
-        status: "breve",
+        status: "aguardando_feedback",
     },
     {
         id: 5,
@@ -68,29 +58,42 @@ const trainingsMock: Training[] = [
         id: 6,
         title: "Lorem ipsum dolor",
         hours: 72,
-        progress: 100,
+        progress: 85,
         startDate: "20/05",
         endDate: "30/06",
         daysLeft: 0,
-        status: "pendencias",
+        status: "pendencia",
     },
 ];
 
-type StatusFilter = "todos" | "em-andamento" | "concluido" | "oculto";
+type StatusFilter = "todos" | "em_andamento" | "concluido" | "oculto";
 
 export const Treinamentos = () => {
     const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedStatus, setSelectedStatus] = useState<StatusFilter>("todos");
+    const [trainings, setTrainings] = useState<Training[]>(trainingsMock);
 
-    const filteredTrainings = trainingsMock.filter((training) => {
-        const matchesSearch = training.title.toLowerCase().includes(searchTerm.toLowerCase());
-        return matchesSearch;
-    });
+    useEffect(() => {
+        let result = trainingsMock;
+        if(searchTerm !== "") {
+            result = result.filter((training) => (
+                training.title.toLowerCase().includes(searchTerm.toLowerCase())
+            ))
+        }
+
+        if(selectedStatus !== "todos") {
+            result = result.filter((training) => (
+                training.status === selectedStatus
+            ));
+        }
+
+        setTrainings(result);
+    }, [selectedStatus, searchTerm]);
 
     const getButtonStyle = (training: Training) => {
         switch (training.status) {
-            case "em-andamento":
+            case "em_andamento":
                 return {
                     bgColor: "#F5A623",
                     text: `Expira em ${training.daysLeft} dias`,
@@ -100,41 +103,43 @@ export const Treinamentos = () => {
                     bgColor: "#17C964",
                     text: "Avaliação Final Disponível",
                 };
-            case "pre-avaliacao":
+            case "pre_avaliacao":
                 return {
                     bgColor: "#006FEE",
                     text: "Pré-avaliação Disponível",
                 };
-            case "breve":
+            case "pendencia":
                 return {
                     bgColor: "#616161",
-                    text: "Em Breve",
+                    text: "Concluído com Pendências",
+                };
+            case "aguardando_feedback":
+                return {
+                    bgColor: "#616161",
+                    text: "Aguardando Feedback",
                 };
             case "concluido":
                 return {
                     bgColor: "#BDBDBD",
                     text: "Concluído",
                 };
-            case "pendencias":
-                return {
-                    bgColor: "#616161",
-                    text: "Concluído com Pendências",
-                };
         }
     };
 
     const getProgressBarColor = (status: Training["status"]) => {
         switch (status) {
-            case "em-andamento":
+            case "pre_avaliacao":
+                return "bg-primary";
+            case "em_andamento":
                 return "#F5A623";
             case "avaliacao":
-            case "pre-avaliacao":
+                return "bg-primary";
+            case "aguardando_feedback":
+                return "#BDBDBD";
             case "concluido":
                 return "#17C964";
-            case "pendencias":
-                return "#17C964";
-            case "breve":
-                return "#BDBDBD";
+            case "pendencia":
+                return "#F5A623";
             default:
                 return "#F5A623";
         }
@@ -142,40 +147,21 @@ export const Treinamentos = () => {
 
     return (
         <div className="p-8 bg-neutral-50 min-h-screen">
-            {/* Header com busca e filtro */}
-            <div className="mb-6 flex items-center gap-4">
-                <div className="flex-1">
-                    <Input
-                        type="text"
-                        placeholder="Procurar por nome..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="bg-white"
-                    />
-                </div>
-                <Button className="bg-primary text-white font-semibold px-6 flex items-center gap-2">
-                    <svg
-                        className="w-5 h-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
-                        />
-                    </svg>
-                    Filtrar
-                </Button>
+            <div className="mb-6 flex items-center gap-4 w-full">
+                <Input
+                    type="text"
+                    placeholder="Procurar por nome..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="bg-white flex-1"
+                />
+                <div className="flex-1" />
             </div>
 
-            {/* Abas de status */}
             <div className="flex gap-3 flex-wrap mb-8">
                 <button
                     onClick={() => setSelectedStatus("todos")}
-                    className={`px-6 py-2 rounded-full font-semibold transition-all ${
+                    className={`cursor-pointer px-6 py-2 rounded-full font-semibold transition-all ${
                         selectedStatus === "todos"
                             ? "bg-secondary text-white"
                             : "bg-white text-secondary border-2 border-secondary hover:bg-secondary-50"
@@ -184,9 +170,9 @@ export const Treinamentos = () => {
                     Todos
                 </button>
                 <button
-                    onClick={() => setSelectedStatus("em-andamento")}
-                    className={`px-6 py-2 rounded-full font-semibold transition-all ${
-                        selectedStatus === "em-andamento"
+                    onClick={() => setSelectedStatus("em_andamento")}
+                    className={`cursor-pointer px-6 py-2 rounded-full font-semibold transition-all ${
+                        selectedStatus === "em_andamento"
                             ? "bg-secondary text-white"
                             : "bg-white text-secondary border-2 border-secondary hover:bg-secondary-50"
                     }`}
@@ -195,7 +181,7 @@ export const Treinamentos = () => {
                 </button>
                 <button
                     onClick={() => setSelectedStatus("concluido")}
-                    className={`px-6 py-2 rounded-full font-semibold transition-all ${
+                    className={`cursor-pointer px-6 py-2 rounded-full font-semibold transition-all ${
                         selectedStatus === "concluido"
                             ? "bg-secondary text-white"
                             : "bg-white text-secondary border-2 border-secondary hover:bg-secondary-50"
@@ -205,7 +191,7 @@ export const Treinamentos = () => {
                 </button>
                 <button
                     onClick={() => setSelectedStatus("oculto")}
-                    className={`px-6 py-2 rounded-full font-semibold transition-all ${
+                    className={`cursor-pointer px-6 py-2 rounded-full font-semibold transition-all ${
                         selectedStatus === "oculto"
                             ? "bg-secondary text-white"
                             : "bg-white text-secondary border-2 border-secondary hover:bg-secondary-50"
@@ -215,20 +201,17 @@ export const Treinamentos = () => {
                 </button>
             </div>
 
-            {/* Grid de treinamentos */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredTrainings.map((training) => {
+                {trainings.map((training) => {
                     const buttonStyle = getButtonStyle(training);
                     const progressColor = getProgressBarColor(training.status);
 
                     return (
                         <Card
                             key={training.id}
-                            className="overflow-hidden shadow-md hover:shadow-lg transition-shadow rounded-2xl cursor-pointer"
-                            onClick={() => navigate(`/painel/treinamentos/${training.id}`)}
+                            className="overflow-hidden shadow-md hover:shadow-lg transition-shadow rounded-md p-0"
                         >
-                            {/* Imagem/Header azul */}
-                            <div className="w-full h-40 bg-gradient-to-br from-primary-200 to-primary-400 relative flex items-start justify-end p-4">
+                            <div className="w-full h-40 bg-linear-to-br from-primary-200 to-primary-400 relative flex items-start justify-end p-4">
                                 <button className="bg-neutral-300 hover:bg-neutral-400 text-neutral-700 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 transition-colors">
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -238,14 +221,11 @@ export const Treinamentos = () => {
                                 </button>
                             </div>
 
-                            {/* Conteúdo */}
                             <div className="p-5 flex flex-col gap-4">
-                                {/* Título */}
                                 <h3 className="font-bold text-neutral-900 text-lg">
                                     {training.title}
                                 </h3>
 
-                                {/* Horas */}
                                 <div className="flex items-center gap-2 text-neutral-600">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -253,7 +233,6 @@ export const Treinamentos = () => {
                                     <span className="font-medium">{training.hours} horas</span>
                                 </div>
 
-                                {/* Progresso */}
                                 <div>
                                     <div className="flex justify-between items-center mb-2">
                                         <span className="font-semibold text-neutral-900">Progresso: {training.progress}%</span>
@@ -284,13 +263,13 @@ export const Treinamentos = () => {
                                         </span>
                                     </div>
                                 </div>
-
-                                {/* Botão de ação */}
+                                
                                 <Button
-                                    className="w-full text-white font-semibold py-3 rounded-xl transition-all text-base"
+                                    className="w-full text-white font-semibold py-3 rounded-md transition-all text-base"
                                     style={{
                                         backgroundColor: buttonStyle.bgColor,
                                     }}
+                                    onClick={() => navigate(`/painel/treinamentos/${training.id}`)}
                                 >
                                     {buttonStyle.text}
                                 </Button>
@@ -300,8 +279,7 @@ export const Treinamentos = () => {
                 })}
             </div>
 
-            {/* Mensagem quando não há resultados */}
-            {filteredTrainings.length === 0 && (
+            {trainings.length === 0 && (
                 <div className="text-center py-12">
                     <p className="text-neutral-600">Nenhum treinamento encontrado</p>
                 </div>
