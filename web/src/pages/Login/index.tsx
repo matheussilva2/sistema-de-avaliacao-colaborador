@@ -21,8 +21,8 @@ export default function Login() {
     };
 
     return (
-        <main className="min-h-screen bg-white flex items-center justify-center p-4">
-            <Card className="w-full max-w-md rounded-2xl shadow-lg overflow-hidden">
+        <main className="min-h-screen bg-white flex items-center justify-center">
+            <Card className="w-full max-w-md rounded-2xl shadow-lg overflow-hidden p-0">
                 <div className="bg-primary p-8 text-center">
                     <h1 className="text-white text-3xl font-bold">Capacita NEES</h1>
                 </div>
