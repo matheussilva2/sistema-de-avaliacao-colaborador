@@ -6,6 +6,8 @@ import { MyProfile } from "./pages/MyProfile";
 import { Treinamentos } from "./pages/Treinamentos";
 import { DetalhesTreinamento } from "./pages/DetalhesTreinamento";
 import { AuthProvider } from "./providers/AuthProvider";
+import { ManageUsers } from "./pages/ManageUsers";
+import { UserData } from "./pages/UserData";
 
 function App() {
 
@@ -17,7 +19,8 @@ function App() {
         <Route path="painel" element={<Template titulo="TESTE" />}>
           <Route index element={<>Início</>} />
           <Route path="meu-perfil" element={<MyProfile />} />
-          <Route path="colaboradores" element={<>Colaboradores</>} />
+          <Route path="colaboradores" element={<ManageUsers />} />
+          <Route path="colaboradores/:id" element={<UserData />} />
           <Route path="treinamentos/:id" element={<DetalhesTreinamento />} />
           <Route path="treinamentos" element={<Treinamentos />} />
           <Route path="gerenciar-treinamentos" element={<>Gerenciar Treinamentos</>} />
