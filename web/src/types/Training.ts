@@ -1,3 +1,5 @@
+import type { Quiz } from "./Quiz";
+
 export type Training = {
     id: number;
     title: string;
@@ -6,5 +8,8 @@ export type Training = {
     startDate: string;
     endDate: string;
     daysLeft: number;
-    status: "em_andamento" | "pre_avaliacao" | "avaliacao" | "aguardando_feedback" | "concluido" | "pendencia";
+    status: "em_breve" | "em_andamento" | "pre_avaliacao" | "avaliacao" | "aguardando_feedback" | "concluido" | "pendencia";
+    pretest?: Quiz;
+    test?: Quiz;
+    avaliation?: Quiz;
 };

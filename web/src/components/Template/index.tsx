@@ -58,6 +58,7 @@ export default function({ titulo }: TemplateGestorProps) {
                             if(item.permission) {
                                 if(user?.permissoes.includes(item.permission)){
                                     return <MenuItem
+                                            key={item.link}
                                             link={item.link}
                                             label={item.label}
                                             isActive={pathname === item.link}
@@ -65,6 +66,7 @@ export default function({ titulo }: TemplateGestorProps) {
                                 }
                             } else {
                                 return <MenuItem
+                                            key={item.link}
                                             link={item.link}
                                             label={item.label}
                                             isActive={pathname === item.link}
