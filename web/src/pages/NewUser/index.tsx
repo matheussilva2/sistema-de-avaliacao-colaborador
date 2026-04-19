@@ -101,6 +101,23 @@ export const NewUser = () => {
                                     <Label
                                         htmlFor="profile_email_input"
                                         className="text-primary-700 font-semibold text-sm">
+                                            CPF
+                                    </Label>
+                                    <Input
+                                        type="text"
+                                        placeholder="Somente números"
+                                        className="bg-white"
+                                        name="cpf"
+                                        id="profile_email_input"
+                                        minLength={11}
+                                        maxLength={11}
+                                        required
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-2">
+                                    <Label
+                                        htmlFor="profile_email_input"
+                                        className="text-primary-700 font-semibold text-sm">
                                             E-mail
                                     </Label>
                                     <Input
@@ -192,6 +209,7 @@ export const NewUser = () => {
                                         }
                                     </div>
                                 </div>
+                                <div />
 
                                 <Button
                                     className="w-full bg-primary text-white font-semibold mt-6">
