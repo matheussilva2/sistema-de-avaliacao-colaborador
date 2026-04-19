@@ -1,34 +1,8 @@
 import { useState } from "react";
 import { Button, Card, Input, Label, Checkbox } from "@heroui/react";
-import type { Permission } from "../../types/Permission";
-
-const permissionsMock: Permission[] = [
-    {
-        name: "manage_trainings",
-        label: "Gerenciar Treinamentos",
-        isEnabled: true
-    },
-    {
-        name: "manage_users",
-        label: "Gerenciar usuários",
-        isEnabled: false
-    }
-];
 
 export const MyProfile = () => {
     const [isEditing, setIsEditing] = useState(false);
-    const [permissions, setPermissions] = useState<Permission[]>(permissionsMock);
-
-    const handlePermissionChange = (permissionName: string) => {
-        const updatedPermissions = permissions.map(permission => {
-            if(permission.name === permissionName) {
-                return { ...permission, isEnabled: !permission.isEnabled }
-            }
-            return permission;
-        });
-        
-        setPermissions(updatedPermissions);
-    };
 
     return (
         <div className="p-8 bg-neutral-50 min-h-screen">
@@ -188,54 +162,6 @@ export const MyProfile = () => {
                     </Card>
                 </div>
             </div>
-
-            <Card className="rounded-xl shadow-md overflow-hidden p-0 gap-0">
-                <div className="bg-primary p-4">
-                    <span className="text-white font-semibold text-base">Cargos e Permissões</span>
-                </div>
-                <div className="bg-primary-50 p-6">
-                    <div className="grid grid-cols-2 gap-6">
-                        <div className="flex flex-col gap-3">
-                            <Label className="text-primary-700 font-semibold text-sm">Cargo</Label>
-                            <Input
-                                type="text"
-                                placeholder="Analista de Dados"
-                                className="bg-white"
-                                disabled
-                            />
-                        </div>
-                        <div />
-                    </div>
-
-                    <div className="mt-6">
-                        <h3 className="text-primary-700 font-semibold text-sm mb-4">Permissões</h3>
-                        <div className="flex flex-col gap-3">
-                            {
-                                permissions.map((permission) => (
-                                    <div className="flex items-center gap-2">
-                                        <Checkbox
-                                            id={`permissions_${permission.name}`}
-                                            isSelected={permission.isEnabled}
-                                            onChange={() => handlePermissionChange(permission.name)}
-                                        >
-                                            <Checkbox.Control
-                                            >
-                                                <Checkbox.Indicator />
-                                            </Checkbox.Control>
-                                        </Checkbox>
-                                        <label
-                                            htmlFor={`permissions_${permission.name}`}
-                                            className="text-gray-700 cursor-pointer"
-                                        >
-                                            {permission.label}
-                                        </label>
-                                    </div>
-                                ))
-                            }
-                        </div>
-                    </div>
-                </div>
-            </Card>
         </div>
     );
 }
