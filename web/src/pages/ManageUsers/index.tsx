@@ -6,7 +6,10 @@ export const ManageUsers = () => {
         <div className="py-10 px-4">
             <div className="flex justify-between mb-8">
                 <Input type="text" placeholder="Procurar por nome..." className="w-87" />
-                <Link to="#" className="bg-primary text-white px-4 py-2.5 rounded-lg">Adicionar Usuário</Link>
+                <Link
+                    to="/painel/colaboradores/criar"
+                    className="bg-primary text-white px-4 py-2.5 rounded-lg"
+                >Adicionar Usuário</Link>
             </div>
 
             <Table>

@@ -8,6 +8,7 @@ import { DetalhesTreinamento } from "./pages/DetalhesTreinamento";
 import { AuthProvider } from "./providers/AuthProvider";
 import { ManageUsers } from "./pages/ManageUsers";
 import { UserData } from "./pages/UserData";
+import { NewUser } from "./pages/NewUser";
 
 function App() {
 
@@ -20,6 +21,7 @@ function App() {
           <Route index element={<>Início</>} />
           <Route path="meu-perfil" element={<MyProfile />} />
           <Route path="colaboradores" element={<ManageUsers />} />
+          <Route path="colaboradores/criar" element={<NewUser />} />
           <Route path="colaboradores/:id" element={<UserData />} />
           <Route path="treinamentos/:id" element={<DetalhesTreinamento />} />
           <Route path="treinamentos" element={<Treinamentos />} />
