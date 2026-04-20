@@ -9,6 +9,7 @@ import { AuthProvider } from "./providers/AuthProvider";
 import { ManageUsers } from "./pages/ManageUsers";
 import { UserData } from "./pages/UserData";
 import { NewUser } from "./pages/NewUser";
+import { TestPage } from "./pages/TestPage";
 
 function App() {
 
@@ -24,6 +25,7 @@ function App() {
           <Route path="colaboradores/criar" element={<NewUser />} />
           <Route path="colaboradores/:id" element={<UserData />} />
           <Route path="treinamentos/:id" element={<DetalhesTreinamento />} />
+          <Route path="treinamentos/:id/:test_id" element={<TestPage />} />
           <Route path="treinamentos" element={<Treinamentos />} />
           <Route path="gerenciar-treinamentos" element={<>Gerenciar Treinamentos</>} />
         </Route>
