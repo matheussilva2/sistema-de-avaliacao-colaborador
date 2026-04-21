@@ -1,11 +1,19 @@
+export type QuestionOption = {
+    id: number;
+    label: string;
+    text: string;
+}
+
 export type Question = {
     id: number;
-    question: string;
+    title: string;
+    right_answer?: number;
+    options: QuestionOption[]
 }
 
 export type Quiz = {
     id: number;
-    right_answer?: number;
+    type: 'pre_avaliacao' | 'avaliacao' | 'feedback';
     status: 'INDISPONIVEL' | 'DISPONIVEL' | 'FINALIZADO';
     correct_answers?: number;
     min_required: number;
