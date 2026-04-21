@@ -1,4 +1,4 @@
-import { Checkbox } from "@heroui/react"
+import { Button, Checkbox, Radio, RadioGroup } from "@heroui/react"
 
 export interface Option {
   id: string;
@@ -49,18 +49,18 @@ export const questionsMock: Question[] = [
 export const TestPage = () => {
     const getQuestionOptions = (question: Question) => (
         <>
-            {question.options.forEach((option) => (
-                <div className="flex gap-2 items-center">
-                    <Checkbox id={`question_${question.id}`}>
-                        <Checkbox.Control>
-                            <Checkbox.Indicator />
-                        </Checkbox.Control>
-                    </Checkbox>
-                    <label htmlFor="question_${question.id}" className="cursor-pointer">
-                        {option.text}
-                    </label>
-                </div>
-            ))}
+                <RadioGroup name={`question_${question.id}_answer`}>
+                    {question.options.map((option) => (
+                        <Radio value={option.label} id={`answer_${question.id}_${option.label}`} key={option.label}>
+                            <Radio.Control>
+                                <Radio.Indicator />
+                            </Radio.Control>
+                            <Radio.Content>
+                                <label className="cursor-pointer">{option.text}</label>
+                            </Radio.Content>
+                        </Radio>
+                    ))}
+                </RadioGroup>
         </>
     )
 
@@ -74,14 +74,15 @@ export const TestPage = () => {
             <section className="flex flex-col gap-2.5">
                 {
                     questionsMock.map((question, index) => (
-                        <div key={question.id}>
-                            <h2 className="text-lg font-semibold">{`${index+1}. ${question.title}`}</h2>
-                            <div className="flex gap-2.5">
+                        <div key={question.id} className="mb-2.5">
+                            <h2 className="text-lg font-semibold mb-2.5">{`${index+1}. ${question.title}`}</h2>
+                            <div className="flex flex-col gap-2.5">
                                 {getQuestionOptions(question)}
                             </div>
                         </div>
                     ))
                 }
+                <Button variant="primary" className="mt-2">Enviar Respostas</Button>
             </section>
         </div>
     )

@@ -332,9 +332,11 @@ export const DetalhesTreinamento = () => {
                             </div>
                         </div>
 
-                        <Button className="w-full bg-primary text-white font-semibold py-3">
-                            Iniciar Teste
-                        </Button>
+                        <Link to="teste">
+                            <Button className="w-full bg-primary text-white font-semibold py-3">
+                                Iniciar Teste
+                            </Button>
+                        </Link>
 
                     </div>
                 )}
