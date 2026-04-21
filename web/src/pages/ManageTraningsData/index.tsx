@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Button, Card, Input, Checkbox, Tabs, RadioGroup, Radio } from "@heroui/react";
 import type { Training } from "../../types/Training";
-import type { Question } from "../../types/Quiz";
+import type { Question, Quiz } from "../../types/Quiz";
 
 export const trainingMock: Training = {
     id: 1,
@@ -13,11 +13,11 @@ export const trainingMock: Training = {
     endDate: "2026-05-15",
     daysLeft: 14,
     status: "em_breve",
-    avaliation: {
+    pretest: {
         id: 1,
         type: 'pre_avaliacao',
         status: 'INDISPONIVEL',
-        min_required: 3,
+        min_required: 0,
         questions: [
             {
                 id: 1,
@@ -48,6 +48,69 @@ export const trainingMock: Training = {
                 { id: 11, label: "C", text: "Select" },
                 { id: 12, label: "D", text: "Switch" },
                 ],
+            }
+        ]
+    },
+    test: {
+        id: 2,
+        type: 'avaliacao',
+        status: 'INDISPONIVEL',
+        min_required: 3,
+        questions: [
+            {
+                id: 1,
+                title: "Qual a principal diferença entre o useMemo e o useCallback?",
+                right_answer: 2,
+                options: [
+                    { id: 1, label: "A", text: "Não há diferença, são apenas aliases para a mesma função." },
+                    { id: 2, label: "B", text: "O useMemo memoriza um valor calculado, enquanto o useCallback memoriza uma função." },
+                    { id: 3, label: "C", text: "O useCallback só funciona em componentes de classe." },
+                    { id: 4, label: "D", text: "O useMemo é disparado em todo render, independente das dependências." }
+                ]
+            },
+            {
+                id: 2,
+                title: "No TypeScript, o que o operador 'readonly' faz em uma propriedade de interface?",
+                right_answer: 5,
+                options: [
+                    { id: 5, label: "A", text: "Impede que a propriedade seja modificada após a inicialização do objeto." },
+                    { id: 6, label: "B", text: "Torna a propriedade opcional (pode ser undefined)." },
+                    { id: 7, label: "C", text: "Garante que a propriedade seja sempre do tipo string." },
+                    { id: 8, label: "D", text: "Permite que a propriedade seja acessada apenas dentro de classes herdadas." }
+                ]
+            },
+            {
+                id: 3,
+                title: "Qual o comando SQL utilizado para remover todos os registros de uma tabela sem excluir a sua estrutura?",
+                right_answer: 11,
+                options: [
+                    { id: 9, label: "A", text: "DROP TABLE" },
+                    { id: 10, label: "B", text: "REMOVE ALL" },
+                    { id: 11, label: "C", text: "TRUNCATE TABLE" },
+                    { id: 12, label: "D", text: "DELETE DATABASE" }
+                ]
+            },
+            {
+                id: 4,
+                title: "No ecossistema Laravel, para que serve o Eloquent?",
+                right_answer: 13,
+                options: [
+                    { id: 13, label: "A", text: "É o mapeador objeto-relacional (ORM) padrão para interagir com o banco de dados." },
+                    { id: 14, label: "B", text: "É uma engine de templates para renderizar o frontend." },
+                    { id: 15, label: "C", text: "Serve exclusivamente para gerenciar as rotas da API." },
+                    { id: 16, label: "D", text: "É a ferramenta de linha de comando para rodar migrações." }
+                ]
+            },
+            {
+                id: 5,
+                title: "Qual propriedade CSS é usada no Tailwind para controlar o espaçamento interno (padding) de um elemento?",
+                right_answer: 17,
+                options: [
+                    { id: 17, label: "A", text: "A família de classes que começa com 'p-' (ex: p-4, px-2)." },
+                    { id: 18, label: "B", text: "A família de classes que começa com 'm-' (ex: m-4, my-2)." },
+                    { id: 19, label: "C", text: "A classe 'space-x' apenas." },
+                    { id: 20, label: "D", text: "A classe 'gap-4'." }
+                ]
             }
         ]
     }
@@ -81,77 +144,88 @@ export const ManageTrainingsData = () => {
         duracao: 0,
     });
     const [training, setTraining] = useState<Training>(trainingMock);
+    const [test, setTest] = useState<Quiz | null>(null);
     const [feedback, setFeedback] = useState("");
 
+    useEffect(() => {
+        switch(activeTab) {
+            case "pre_avaliacao":
+                if(training.pretest)
+                    setTest(training.pretest);
+                break;
+            case "avaliacao":
+                if(training.test)
+                    setTest(training.test);
+                break
+        }
+    }, [activeTab]);
+
     const addNewQuestionOption = (questionId: number) => {
-        setTraining((prev) => {
-            if (!prev.avaliation?.questions) return prev;
+        setTest((prev) => {
+            if(!prev || !test) return prev;
 
             return {
-            ...prev,
-            avaliation: {
-                ...prev.avaliation,
-                questions: prev.avaliation.questions.map((q) => {
-                if (q.id !== questionId) return q;
+                ...prev,
+                questions: test.questions.map((q) => {
+                    if (q.id !== questionId) return q;
 
-                const nextLabel = String.fromCharCode(65 + q.options.length);
-
-                return {
-                    ...q,
-                    options: [
-                    ...q.options,
-                    {
-                        id: Date.now(),
-                        label: nextLabel,
-                        text: "",
-                    },
-                    ],
-                };
+                    const nextLabel = String.fromCharCode(65 + q.options.length);
+                    return {
+                        ...q,
+                        options: [
+                        ...q.options,
+                        {
+                            id: Date.now(),
+                            label: nextLabel,
+                            text: "",
+                        },
+                        ],
+                    };
                 }),
-            },
             };
         });
-        };
+    };
 
     const addNewQuestion = () => {
-        setTraining((prev) => {
-            if (!prev.avaliation) return prev;
+        setTest((prev) => {
+            if (!prev) return prev;
 
-            const newQuestionId = prev.avaliation.questions.length > 0 
-            ? Math.max(...prev.avaliation.questions.map(q => q.id)) + 1 
+            const newQuestionId = prev.questions.length > 0 
+            ? Math.max(...prev.questions.map(q => q.id)) + 1 
             : 1;
 
             const newQuestion: Question = {
-            id: newQuestionId,
-            title: "Nova pergunta sem título",
-            options: [
-                { id: Date.now(), label: "A", text: "Clique para editar a alternativa" }
-            ],
+                id: newQuestionId,
+                title: "Nova pergunta sem título",
+                options: [
+                    { 
+                    id: Date.now(), 
+                    label: "A", 
+                    text: "Clique para editar a alternativa" 
+                    }
+                ],
             };
 
             return {
-            ...prev,
-            avaliation: {
-                ...prev.avaliation,
-                questions: [...prev.avaliation.questions, newQuestion],
-            },
+                ...prev,
+                questions: [...prev.questions, newQuestion],
             };
         });
         };
 
     const getQuestionOptions = (question: Question) => (
         <>
-                <RadioGroup name={`question_${question.id}_answer`} className="gap-2 mb-4">
-                    {question.options.map((option) => (
-                        <div className="flex items-start gap-3 p-4 rounded-lg bg-neutral-100 border-2 border-neutral-300">
-                            <input type="radio" className="mt-1" disabled />
-                            <Input defaultValue={option.text} className="flex-1" />
-                        </div>
-                    ))}
-                    <div className="w-full flex justify-center">
-                        <Button onClick={() => addNewQuestionOption(question.id)}>+ Adicionar alternativa</Button>
+            <RadioGroup name={`question_${question.id}_answer`} className="gap-2 mb-4">
+                {question.options.map((option) => (
+                    <div className="flex items-start gap-3 p-4 rounded-lg bg-neutral-100 border-2 border-neutral-300">
+                        <input type="radio" className="mt-1" disabled />
+                        <Input value={option.text} className="flex-1" />
                     </div>
-                </RadioGroup>
+                ))}
+                <div className="w-full flex justify-center">
+                    <Button onClick={() => addNewQuestionOption(question.id)}>+ Adicionar alternativa</Button>
+                </div>
+            </RadioGroup>
         </>
     )
 
@@ -249,7 +323,7 @@ export const ManageTrainingsData = () => {
             </div>
 
             <div className="px-6">
-                {activeTab === "pre_avaliacao" && (
+                {["pre_avaliacao", "avaliacao"].includes(activeTab) && (
                     <Card className="p-0">
                         <Card.Header className="bg-primary-200 py-7 px-6 rounded-t-lg">
                             <h3 className="font-bold text-primary-700">Pré-avaliação</h3>
@@ -257,26 +331,24 @@ export const ManageTrainingsData = () => {
                         <Card.Content className="px-4">
                             <div className="grid grid-cols-2 gap-2.5 py-3 px-4 border-2 border-primary-200 rounded-lg bg-blue-50">
                                 <div className="bg-primary-100 p-4 rounded-lg">
-                                    <p className="text-primary-700 text-lg font-semibold mb-1">Mínimo Exigido</p>
-                                    <p className="text-primary-700 text-lg font-bold">
-                                        {training.avaliation?.questions.length}
-                                    </p>
+                                    <p className="text-primary-700 text-lg font-semibold mb-1">Acertos mínimos</p>
+                                    <Input value={test?.min_required} className="text-primary-700 text-lg font-bold" />
                                 </div>
                             </div>
 
                             <div className="mb-8 p-4 border-2 border-primary-200 rounded-lg bg-blue-50">
                                 {
-                                    training.avaliation?.questions.map((question, index) => (
+                                    test?.questions.map((question, index) => (
                                         <>
                                             <p className="font-bold text-neutral-900 mb-4 text-base flex items-center">
                                                 {index + 1}.&nbsp;
-                                                <Input defaultValue={question.title} className="flex-1" />
+                                                <Input value={question.title} className="flex-1" />
                                             </p>
                                             <div className="space-y-3">
                                                 { getQuestionOptions(question) }
                                             </div>
                                             {
-                                                training.avaliation?.questions.length === (index+1) && (
+                                                test?.questions.length === (index+1) && (
                                                     <Button onPress={addNewQuestion}>+ Adicionar Questão</Button>
                                                 )
                                             }
@@ -335,37 +407,6 @@ export const ManageTrainingsData = () => {
                         <Button className="w-full mt-6 bg-primary text-white font-semibold py-3">
                             Salvar Alterações
                         </Button>
-                    </div>
-                )}
-
-                {activeTab === "avaliacao" && (
-                    <div>
-                        <div className="bg-primary-100 p-4 rounded-lg mb-4">
-                            <h3 className="font-bold text-neutral-900 mb-2">Pós-teste - Resultado</h3>
-                        </div>
-                        
-                        <div className="space-y-4 mb-4">
-                            <div className="bg-primary-100 p-4 rounded-lg">
-                                <div className="flex items-start gap-3 mb-3">
-                                    <Checkbox />
-                                    <div>
-                                        <p className="font-semibold text-neutral-900">
-                                            Acertos: 3 de 5
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="text-neutral-600">
-                                    <p className="text-sm">Mínimo Exigido: 0 de 5</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <Link to="teste">
-                            <Button className="w-full bg-primary text-white font-semibold py-3">
-                                Iniciar Teste
-                            </Button>
-                        </Link>
-
                     </div>
                 )}
             </div>
