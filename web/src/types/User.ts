@@ -1,9 +1,12 @@
+import type { Permission } from "./Permission";
+
+export type Cargo = "colaborador" | "gerenciador";
+
 export type User = {
-    nome: string;
-    sobrenome: string;
-    email: string;
-    password?: string;
-    foto_perfil: string;
-    cargo: string;
-    permissoes: string[]
-}
+  nome: string;
+  sobrenome: string;
+  email: string;
+  telefone: string;
+  cargo: Cargo;
+  permissoes: Permission[];
+};

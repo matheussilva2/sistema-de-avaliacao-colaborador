@@ -1,96 +1,156 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { MenuItem } from "./components/MenuItem";
-import { useAuth } from "../../providers/AuthProvider";
-import { useEffect } from "react";
+import { ArrowLeft, LogOut } from "lucide-react";
+import { userMock } from "../../mock";
 
-type TemplateGestorProps = {
-    titulo: string;
+// type TemplateGestorProps = {
+//   titulo: string;
+// };
+
+function getTitle(pathname: string) {
+  if (pathname === "/painel") return "Início";
+  if (pathname === "/painel/meu-perfil") return "Meu Perfil";
+  if (pathname === "/painel/colaboradores") return "Colaboradores";
+
+  if (pathname.startsWith("/painel/colaboradores/")) {
+    return "Detalhes do Colaborador";
+  }
+
+  if (pathname === "/painel/treinamentos") return "Treinamentos";
+
+  return "Painel";
 }
 
-export default function({ titulo }: TemplateGestorProps) {
-    const {pathname} = useLocation();
-    const navigate = useNavigate();
+export default function Tamplate() {
+  const { pathname } = useLocation();
 
-    const {user, loading, logout} = useAuth();
+  const navigate = useNavigate();
 
-    const menuItems = [
-        {
-            label: "Início",
-            link: "/painel"
-        },
-        {
-            label: "Meu Perfil",
-            link: "/painel/meu-perfil"
-        },
-        {
-            label: "Colaboradores",
-            link: "/painel/colaboradores",
-            permission: "manage_users"
-        },
-        {
-            label: "Treinamentos",
-            link: "/painel/treinamentos"
-        },
-        {
-            label: "Gerenciar Treinamento",
-            link: "/painel/gerenciar-treinamentos",
-            permission: "manage_trainings"
-        }
-    ];
+  // const menuItemsAdmin = [
+  //     {
+  //         label: "Início",
+  //         link: "/painel"
+  //     },
+  //     {
+  //         label: "Meu Perfil",
+  //         link: "/painel/meu-perfil"
+  //     },
+  //     {
+  //         label: "Colaboradores",
+  //         link: "/painel/colaboradores"
+  //     },
+  //     {
+  //         label: "Treinamentos",
+  //         link: "/painel/treinamentos"
+  //     },
+  //     {
+  //         label: "Gerenciar Treinamento",
+  //         link: "/painel/gerenciar-treinamentos"
+  //     },
+  //     {
+  //         label: "Sair",
+  //         link: "/painel/sair"
+  //     },
+  // ];
 
-    useEffect(() => {
-        if(!user && !loading) {
-            navigate('/');
-        }
-    }, [user, loading]);
+  const menuItemsColaborador = [
+    {
+      label: "Início",
+      link: "/painel",
+    },
+    {
+      label: "Meu Perfil",
+      link: "/painel/meu-perfil",
+    },
 
-    return (
-        <div className="flex">
-            <aside className="w-75 h-screen bg-white border-r border-zinc-300">
-                <div className="border-b border-gray-300 py-6">
-                    <a href="#" className="block text-3xl w-full text-center font-semibold text-gray-950">
-                        Capacita NEES
-                    </a>
-                </div>
-                <nav className="flex flex-col gap-1 pt-5">
-                    {
-                        menuItems.map((item) => {
-                            if(item.permission) {
-                                if(user?.permissoes.includes(item.permission)){
-                                    return <MenuItem
-                                            key={item.link}
-                                            link={item.link}
-                                            label={item.label}
-                                            isActive={pathname === item.link}
-                                        />
-                                }
-                            } else {
-                                return <MenuItem
-                                            key={item.link}
-                                            link={item.link}
-                                            label={item.label}
-                                            isActive={pathname === item.link}
-                                        />;
-                            }
-                        })
-                    }
-                    <button
-                        className={
-                            `w-full h-12 px-5 bg-white text-gray-950 text-left cursor-pointer`
-                        }
-                        onClick={logout}>
-                        <span>Sair</span>
-                    </button>
-                </nav>
-            </aside>
-            <div className="flex-1">
-                <header className="py-7 border-b border-gray-300 text-lg font-semibold flex items-center px-6 bg-white">
-                    <h1 className="text-lg font-semibold">{titulo}</h1>
-                </header>
-                <main>
-                    <Outlet />
-                </main>
-            </div>
+    // {
+    //   label: "Colaboradores",
+    //   link: "/painel/colaboradores",
+    // },
+    {
+      label: "Meus Treinamentos",
+      link: "/painel/treinamentos",
+    },
+    {
+      label: "Sair",
+      link: "/",
+    },
+  ];
+  const menuItemsGerenciador = [
+    {
+      label: "Meu Perfil",
+      link: "/painel/meu-perfil",
+    },
+
+    {
+      label: "Colaboradores",
+      link: "/painel/colaboradores",
+    },
+    {
+      label: "Gerenciar Treinamentos",
+      link: "/painel/gerenciar-treinamentos",
+    },
+    {
+      label: "Sair",
+      link: "/",
+    },
+  ];
+
+  const menuItems =
+    userMock.cargo === "colaborador"
+      ? menuItemsColaborador
+      : menuItemsGerenciador;
+
+  const showBackButton = !menuItemsColaborador.some(
+    (item) => item.link === pathname,
+  );
+
+  return (
+    <div className="flex">
+      <aside className="w-75 h-screen bg-white border-r border-zinc-300">
+        <div className="border-b border-gray-300 py-6">
+          <a
+            href="#"
+            className="block text-3xl w-full text-center font-semibold text-gray-950"
+          >
+            Capacita NEES
+          </a>
         </div>
-    );
+        <nav className="flex flex-col gap-1 pt-5">
+          {menuItems.map((item) => (
+            <MenuItem link={item.link} isActive={pathname === item.link}>
+              {item.label === "Sair" ? (
+                <span className="flex gap-3 items-center">
+                  {item.label}
+                  <LogOut className="size-4" />
+                </span>
+              ) : (
+                <span>{item.label}</span>
+              )}
+            </MenuItem>
+          ))}
+        </nav>
+      </aside>
+      <div className="flex-1">
+        <header className="py-7 border-b border-gray-300 text-lg font-semibold flex items-center px-6 bg-white">
+          {showBackButton && (
+            <button
+              onClick={() => navigate(-1)}
+              className="hover:text-gray-800 text-black flex gap-2 items-center hover:bg-gray-100 p-1 mr-2 rounded-md cursor-pointer"
+            >
+              <ArrowLeft className="size-5" />
+              {/* <h1 className="text-lg font-semibold">{getTitle(pathname)}</h1> */}
+            </button>
+          )}
+
+          <h1 className="text-lg font-semibold text-black">
+            {getTitle(pathname)}
+          </h1>
+        </header>
+        <main>
+          <Outlet />
+        </main>
+      </div>
+    </div>
+  );
 }

@@ -1,167 +1,166 @@
 import { useState } from "react";
-import { Button, Card, Input, Label, Checkbox } from "@heroui/react";
+import { Button, Card, Input, Checkbox } from "@heroui/react";
+import { userMock } from "../../mock";
+import type { Permission } from "../../types/Permission";
 
 export const MyProfile = () => {
-    const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [user, setUser] = useState(userMock);
 
-    return (
-        <div className="p-8 bg-neutral-50 min-h-screen">
-            <div className="flex gap-6 mb-8">
-                <div className="w-64">
-                    <Card className="bg-primary-50 rounded-xl shadow-md overflow-hidden p-0">
-                        <div className="p-6 flex flex-col items-center gap-4">
-                            <img
-                                width={80}
-                                height={80}
-                                className="rounded-full border-4 border-primary object-cover"
-                                src="https://picsum.photos/seed/placeholder/500/500"
-                                alt="Profile"
-                            />
 
-                            <input
-                                id="input-profile-picture"
-                                type="file"
-                                accept="image/png,image/jpg,image/jpeg"
-                                className="absolute -left-96"
-                            />
+  const handleChange = (field: string, value: string) => {
+    setUser((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
 
-                            <label
-                                htmlFor="input-profile-picture"
-                                className="text-primary font-semibold text-sm px-4 py-2 border-2 rounded-full cursor-pointer border-primary hover:bg-primary-100 transition-colors"
-                            >
-                                Alterar Foto
-                            </label>
 
-                            <div className="text-center">
-                                <span className="block text-primary-700 text-lg font-bold">Ana Maria</span>
-                                <span className="block text-neutral-600 text-sm">Analista de Dados</span>
-                            </div>
-                        </div>
-                    </Card>
-                </div>
-
-                <div className="flex-1">
-                    <Card className="rounded-xl shadow-md overflow-hidden p-0 gap-0">
-                        <div className="bg-primary p-4 border-b-4 border-primary">
-                            <span className="text-white font-semibold text-base">Dados Pessoais</span>
-                        </div>
-                        <div className="bg-primary-50 p-6">
-                            <form className="grid grid-cols-2 gap-4">
-                                <div className="flex flex-col gap-2">
-                                    <Label
-                                        htmlFor="profile_nome_input"
-                                        className="text-primary-700 font-semibold text-sm">
-                                            Nome
-                                    </Label>
-                                    <Input
-                                        type="text"
-                                        placeholder="Digite seu nome"
-                                        className="bg-white"
-                                        disabled={!isEditing}
-                                        value="Ana Maria"
-                                        name="nome"
-                                        id="profile_nome_input"
-                                    />
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    <Label
-                                        htmlFor="profile_sobrenome_input"
-                                        className="text-primary-700 font-semibold text-sm">
-                                            Sobrenome
-                                    </Label>
-                                    <Input
-                                        type="text"
-                                        placeholder="Digite seu sobrenome"
-                                        className="bg-white"
-                                        disabled={!isEditing}
-                                        value="dos Santos"
-                                        name="sobrenome"
-                                        id="profile_sobrenome_input"
-                                    />
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    <Label
-                                        htmlFor="profile_email_input"
-                                        className="text-primary-700 font-semibold text-sm">
-                                            E-mail
-                                    </Label>
-                                    <Input
-                                        type="email"
-                                        placeholder="Digite seu e-mail"
-                                        className="bg-white"
-                                        disabled={!isEditing}
-                                        value="ana.santos@ufal.br"
-                                        name="email"
-                                        id="profile_email_input"
-                                    />
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    <Label
-                                        htmlFor="profile_telefone_input"
-                                        className="text-primary-700 font-semibold text-sm">
-                                            Telefone
-                                    </Label>
-                                    <Input
-                                        type="tel"
-                                        placeholder="(XX) XXXXX-XXXX"
-                                        className="bg-white"
-                                        disabled={!isEditing}
-                                        value="(82) 99999-9999"
-                                        name="telefone"
-                                        id="profile_telefone_input"
-                                    />
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    <Label
-                                        htmlFor="profile_password_input"
-                                        className="text-primary-700 font-semibold text-sm">
-                                            Alterar Senha
-                                    </Label>
-                                    <Input
-                                        type="text"
-                                        placeholder="Nova senha"
-                                        className="bg-white"
-                                        disabled={!isEditing}
-                                        name="password"
-                                        id="profile_password_input"
-                                    />
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    <Label
-                                        htmlFor="profile_repassword_input"
-                                        className="text-primary-700 font-semibold text-sm">
-                                            Confirmar Senha
-                                    </Label>
-                                    <Input
-                                        type="text"
-                                        placeholder="Confirme a senha"
-                                        className="bg-white"
-                                        disabled={!isEditing}
-                                        name="password_confirmation"
-                                        id="profile_repassword_input"
-                                    />
-                                </div>
-                            </form>
-
-                            {
-                                isEditing ? (
-                                    <Button
-                                        onPress={() => setIsEditing(false)}
-                                        className="w-full bg-primary text-white font-semibold mt-6">
-                                        Salvar Alterações
-                                    </Button>
-                                ) : (
-                                    <Button
-                                        onPress={() => setIsEditing(true)}
-                                        className="w-full bg-primary text-white font-semibold mt-6">
-                                        Editar Dados
-                                    </Button>
-                                )
-                            }
-                        </div>
-                    </Card>
-                </div>
-            </div>
-        </div>
+  const handlePermissionChange = (permissionName: string) => {
+    const updated = user.permissoes.map((p: Permission) =>
+      p.name === permissionName
+        ? { ...p, isEnabled: !p.isEnabled }
+        : p
     );
-}
+
+    setUser((prev) => ({
+      ...prev,
+      permissoes: updated,
+    }));
+  };
+
+  return (
+    <div className="p-8 bg-neutral-50 min-h-screen">
+      <div className="flex gap-6 mb-8">
+        {/* PERFIL */}
+        <div className="w-64">
+          <Card className="bg-primary-50 rounded-xl shadow-md p-6 flex flex-col items-center gap-4">
+            <img
+              width={80}
+              height={80}
+              className="rounded-full border-4 border-primary object-cover"
+              src="https://picsum.photos/seed/placeholder/500/500"
+              alt="Profile"
+            />
+
+            <div className="text-center">
+              <span className="block text-primary-700 text-lg font-bold">
+                {user.nome} {user.sobrenome}
+              </span>
+              <span className="block text-neutral-600 text-sm">
+                {user.cargo === "gerenciador"
+                  ? "Gerenciador"
+                  : "Colaborador"}
+              </span>
+            </div>
+          </Card>
+        </div>
+
+        {/* DADOS */}
+        <div className="flex-1">
+          <Card className="rounded-xl shadow-md overflow-hidden">
+            <div className="bg-primary p-4">
+              <span className="text-white font-semibold">
+                Dados Pessoais
+              </span>
+            </div>
+
+            <div className="bg-primary-50 p-6">
+              <form className="grid grid-cols-2 gap-4">
+                <Input
+                  disabled={!isEditing}
+                  value={user.nome}
+                  onChange={(e) =>
+                    handleChange("nome", e.target.value)
+                  }
+                  placeholder="Nome"
+                />
+
+                <Input
+                  disabled={!isEditing}
+                  value={user.sobrenome}
+                  onChange={(e) =>
+                    handleChange("sobrenome", e.target.value)
+                  }
+                  placeholder="Sobrenome"
+                />
+
+                <Input
+                  disabled={!isEditing}
+                  value={user.email}
+                  onChange={(e) =>
+                    handleChange("email", e.target.value)
+                  }
+                  placeholder="Email"
+                />
+
+                <Input
+                  disabled={!isEditing}
+                  value={user.telefone}
+                  onChange={(e) =>
+                    handleChange("telefone", e.target.value)
+                  }
+                  placeholder="Telefone"
+                />
+              </form>
+
+              <Button
+                onPress={() => {
+                  if (isEditing) {
+                    console.log("SALVO:", user);
+                  }
+                  setIsEditing(!isEditing);
+                }}
+                className="w-full bg-primary text-white mt-6"
+              >
+                {isEditing ? "Salvar Alterações" : "Editar Dados"}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      {/* PERMISSÕES */}
+      <Card className="rounded-xl shadow-md overflow-hidden">
+        <div className="bg-primary p-4">
+          <span className="text-white font-semibold">
+            Cargos e Permissões
+          </span>
+        </div>
+
+        <div className="bg-primary-50 p-6">
+          <Input
+            value={
+              user.cargo === "gerenciador"
+                ? "Gerenciador"
+                : "Colaborador"
+            }
+            disabled
+            className="bg-white mb-6"
+          />
+
+          <div className="flex flex-col gap-3">
+            {user.permissoes.map((permission: Permission) => (
+              <div key={permission.name} className="flex items-center gap-2">
+                <Checkbox
+                  isSelected={permission.isEnabled}
+                  onChange={() =>
+                    handlePermissionChange(permission.name)
+                  }
+                >
+                  <Checkbox.Control>
+                    <Checkbox.Indicator />
+                  </Checkbox.Control>
+                </Checkbox>
+
+                <span className="text-gray-700">
+                  {permission.label}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+};
