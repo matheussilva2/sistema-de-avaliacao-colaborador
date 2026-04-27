@@ -4,6 +4,7 @@ import Template from "./components/Template";
 import Login from "./pages/Login";
 import { MyProfile } from "./pages/MyProfile";
 import { Treinamentos } from "./pages/Treinamentos";
+import TreinamentoDetalhe from "./pages/Treinamentos/Detalhe";
 import Colaboradores from "./pages/Colaboradores";
 import ColaboradorDetalhe from "./pages/Colaboradores/Detalhe";
 import Inicio from "./pages/Inicio";
@@ -21,6 +22,7 @@ function App() {
           <Route path="colaboradores" element={<Colaboradores />} />
           <Route path="colaboradores/:id" element={<ColaboradorDetalhe />} />
           <Route path="treinamentos" element={<Treinamentos />} />
+          <Route path="treinamentos/:id" element={<TreinamentoDetalhe />} />
 
           <Route
             path="gerenciar-treinamentos"

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button, Input, Card } from "@heroui/react";
 import type { Training } from "../../types/Training";
 
@@ -7,6 +8,7 @@ import { trainingsMock } from "../../mock";
 type StatusFilter = "todos" | "em_andamento" | "concluido" | "oculto";
 
 export const Treinamentos = () => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<StatusFilter>("todos");
   const [trainings, setTrainings] = useState<Training[]>(trainingsMock);
@@ -88,6 +90,20 @@ export const Treinamentos = () => {
         return "#F5A623";
       default:
         return "#F5A623";
+    }
+  };
+
+  const getInitialTab = (status: Training["status"]) => {
+    switch (status) {
+      case "pre_avaliacao":
+        return "pre-teste";
+      case "avaliacao":
+      case "concluido":
+      case "pendencia":
+      case "aguardando_feedback":
+        return "pos-teste";
+      default:
+        return "pre-teste";
     }
   };
 
@@ -244,10 +260,15 @@ export const Treinamentos = () => {
                 </div>
 
                 <Button
-                  className="w-full text-white font-semibold py-3 rounded-md transition-all text-base"
+                  className="w-full text-white font-semibold rounded-md transition-all text-base h-auto min-h-12 px-4 py-3 text-center whitespace-normal"
                   style={{
                     backgroundColor: buttonStyle.bgColor,
                   }}
+                  onClick={() =>
+                    navigate(`/painel/treinamentos/${training.id}`, {
+                      state: { initialTab: getInitialTab(training.status) },
+                    })
+                  }
                 >
                   {buttonStyle.text}
                 </Button>
