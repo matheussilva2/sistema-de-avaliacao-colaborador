@@ -59,17 +59,27 @@ export const Treinamentos = () => {
           bgColor: "#BDBDBD",
           text: "Concluído",
         };
+      case "oculto":
+        return {
+          bgColor: "#BDBDBD",
+          text: "Oculto",
+        };
+      default:
+        return {
+          bgColor: "#BDBDBD",
+          text: "Sem ação",
+        };
     }
   };
 
   const getProgressBarColor = (status: Training["status"]) => {
     switch (status) {
       case "pre_avaliacao":
-        return "bg-primary";
+        return "#006FEE";
       case "em_andamento":
         return "#F5A623";
       case "avaliacao":
-        return "bg-primary";
+        return "#006FEE";
       case "aguardando_feedback":
         return "#BDBDBD";
       case "concluido":
