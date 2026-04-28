@@ -8,7 +8,9 @@ import Colaboradores from "./pages/Colaboradores";
 import ColaboradorDetalhe from "./pages/Colaboradores/Detalhe";
 import Inicio from "./pages/Inicio";
 import { GerenciarTreinamentos } from "./pages/Gerenciar-Treinamentos";
-import TreinamentoDetalhes  from "./pages/Gerenciar-Treinamentos/Treinamento-Detalhe";
+import TreinamentoDetalhes from "./pages/Gerenciar-Treinamentos/Treinamento-Detalhe";
+import CriarTreinamento from "./pages/Gerenciar-Treinamentos/Novo-Treinamento";
+import TreinamentoAluno from "./pages/Treinamentos/Treinamento-Detalhe";
 
 function App() {
   return (
@@ -21,10 +23,16 @@ function App() {
           <Route path="colaboradores" element={<Colaboradores />} />
           <Route path="colaboradores/:id" element={<ColaboradorDetalhe />} />
           <Route path="treinamentos" element={<Treinamentos />} />
+          <Route path="treinamentos/:id" element={<TreinamentoAluno />} />
 
           <Route
             path="gerenciar-treinamentos"
             element={<GerenciarTreinamentos />}
+          />
+
+          <Route
+            path="gerenciar-treinamentos/novo-treinamento"
+            element={<CriarTreinamento />}
           />
           <Route
             path="gerenciar-treinamentos/:id"
