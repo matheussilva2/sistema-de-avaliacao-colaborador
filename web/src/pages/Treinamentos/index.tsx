@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button, Input, Card } from "@heroui/react";
+import { Clock } from "lucide-react";
 import type { Training } from "../../types/Training";
 import { trainingsMock } from "../../mock";
 import { useNavigate } from "react-router-dom"; // 👈 add
@@ -156,6 +157,7 @@ export const Treinamentos = () => {
                 </h3>
 
                 <div className="flex items-center gap-2 text-neutral-600">
+                  <Clock size={18} />
                   <span className="font-medium">{training.hours} horas</span>
                 </div>
 

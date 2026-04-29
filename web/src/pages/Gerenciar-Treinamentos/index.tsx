@@ -1,5 +1,5 @@
 import { Button, Input, Card } from "@heroui/react";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import type { Training } from "../../types/Training";
@@ -95,25 +95,6 @@ export const GerenciarTreinamentos = () => {
     }
   };
 
-  const getProgressBarColor = (status: Training["status"]) => {
-    switch (status) {
-      case "pre_avaliacao":
-        return "#176dc9";
-      case "em_andamento":
-        return "#F5A623";
-      case "avaliacao":
-        return "#006FEE";
-      case "aguardando_feedback":
-        return "#BDBDBD";
-      case "concluido":
-        return "#17C964";
-      case "pendencia":
-        return "#F5A623";
-      default:
-        return "#F5A623";
-    }
-  };
-
   return (
     <div className="p-8 bg-neutral-50 min-h-screen">
 
@@ -164,7 +145,6 @@ export const GerenciarTreinamentos = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {trainings.map((training) => {
           const buttonStyle = getButtonStyle(training);
-          const progressColor = getProgressBarColor(training.status);
 
           return (
             <Card
@@ -199,23 +179,18 @@ export const GerenciarTreinamentos = () => {
                   {training.title}
                 </h3>
 
-                <div className="flex items-center gap-2 text-neutral-600">
-                  <span className="font-medium">{training.hours} horas</span>
-                </div>
-
-                <div>
-                  <span className="font-semibold text-neutral-900">
-                    Progresso: {training.progress}%
-                  </span>
-
-                  <div className="w-full bg-neutral-300 rounded-full h-2 mt-2">
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${training.progress}%`,
-                        backgroundColor: progressColor,
-                      }}
-                    />
+                <div className="flex flex-col gap-2 text-neutral-600">
+                  <div className="flex items-center gap-2">
+                    <Clock size={18} />
+                    <span className="font-medium">{training.hours} horas</span>
+                  </div>
+                  <div className="flex gap-4 text-sm">
+                    <span>
+                      <strong>Início:</strong> {training.startDate}
+                    </span>
+                    <span>
+                      <strong>Término:</strong> {training.endDate}
+                    </span>
                   </div>
                 </div>
 
