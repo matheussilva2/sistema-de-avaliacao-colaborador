@@ -72,11 +72,11 @@ export const Treinamentos = () => {
   const getProgressBarColor = (status: Training["status"]) => {
     switch (status) {
       case "pre_avaliacao":
-        return "#006FEE";
+        return "bg-primary";
       case "em_andamento":
         return "#F5A623";
       case "avaliacao":
-        return "#006FEE";
+        return "bg-primary";
       case "aguardando_feedback":
         return "#BDBDBD";
       case "concluido":

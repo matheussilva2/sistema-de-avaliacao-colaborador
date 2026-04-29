@@ -1,31 +1,15 @@
 import { useState } from "react";
-import { Button, Card, Input, Checkbox } from "@heroui/react";
+import { Button, Card, Input } from "@heroui/react";
 import { userMock } from "../../mock";
-import type { Permission } from "../../types/Permission";
 
 export const MyProfile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [user, setUser] = useState(userMock);
 
-
   const handleChange = (field: string, value: string) => {
     setUser((prev) => ({
       ...prev,
       [field]: value,
-    }));
-  };
-
-
-  const handlePermissionChange = (permissionName: string) => {
-    const updated = user.permissoes.map((p: Permission) =>
-      p.name === permissionName
-        ? { ...p, isEnabled: !p.isEnabled }
-        : p
-    );
-
-    setUser((prev) => ({
-      ...prev,
-      permissoes: updated,
     }));
   };
 
@@ -48,9 +32,7 @@ export const MyProfile = () => {
                 {user.nome} {user.sobrenome}
               </span>
               <span className="block text-neutral-600 text-sm">
-                {user.cargo === "gerenciador"
-                  ? "Gerenciador"
-                  : "Colaborador"}
+                {user.cargo === "gerenciador" ? "Gerenciador" : "Colaborador"}
               </span>
             </div>
           </Card>
@@ -60,9 +42,7 @@ export const MyProfile = () => {
         <div className="flex-1">
           <Card className="rounded-xl shadow-md overflow-hidden">
             <div className="bg-primary p-4">
-              <span className="text-white font-semibold">
-                Dados Pessoais
-              </span>
+              <span className="text-white font-semibold">Dados Pessoais</span>
             </div>
 
             <div className="bg-primary-50 p-6">
@@ -70,36 +50,21 @@ export const MyProfile = () => {
                 <Input
                   disabled={!isEditing}
                   value={user.nome}
-                  onChange={(e) =>
-                    handleChange("nome", e.target.value)
-                  }
+                  onChange={(e) => handleChange("nome", e.target.value)}
                   placeholder="Nome"
                 />
 
                 <Input
                   disabled={!isEditing}
                   value={user.sobrenome}
-                  onChange={(e) =>
-                    handleChange("sobrenome", e.target.value)
-                  }
+                  onChange={(e) => handleChange("sobrenome", e.target.value)}
                   placeholder="Sobrenome"
                 />
 
                 <Input
                   disabled={!isEditing}
-                  value={user.email}
-                  onChange={(e) =>
-                    handleChange("email", e.target.value)
-                  }
-                  placeholder="Email"
-                />
-
-                <Input
-                  disabled={!isEditing}
                   value={user.telefone}
-                  onChange={(e) =>
-                    handleChange("telefone", e.target.value)
-                  }
+                  onChange={(e) => handleChange("telefone", e.target.value)}
                   placeholder="Telefone"
                 />
               </form>
@@ -119,48 +84,6 @@ export const MyProfile = () => {
           </Card>
         </div>
       </div>
-
-      {/* PERMISSÕES */}
-      <Card className="rounded-xl shadow-md overflow-hidden">
-        <div className="bg-primary p-4">
-          <span className="text-white font-semibold">
-            Cargos e Permissões
-          </span>
-        </div>
-
-        <div className="bg-primary-50 p-6">
-          <Input
-            value={
-              user.cargo === "gerenciador"
-                ? "Gerenciador"
-                : "Colaborador"
-            }
-            disabled
-            className="bg-white mb-6"
-          />
-
-          <div className="flex flex-col gap-3">
-            {user.permissoes.map((permission: Permission) => (
-              <div key={permission.name} className="flex items-center gap-2">
-                <Checkbox
-                  isSelected={permission.isEnabled}
-                  onChange={() =>
-                    handlePermissionChange(permission.name)
-                  }
-                >
-                  <Checkbox.Control>
-                    <Checkbox.Indicator />
-                  </Checkbox.Control>
-                </Checkbox>
-
-                <span className="text-gray-700">
-                  {permission.label}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </Card>
     </div>
   );
 };
