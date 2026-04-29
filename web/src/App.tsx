@@ -10,6 +10,7 @@ import AdicionarColaborador from "./pages/Colaboradores/AdicionarColaborador";
 import Inicio from "./pages/Inicio";
 import { GerenciarTreinamentos } from "./pages/Gerenciar-Treinamentos";
 import TreinamentoDetalhes from "./pages/Gerenciar-Treinamentos/Treinamento-Detalhe";
+import AdicionarAluno from "./pages/Gerenciar-Treinamentos/AdicionarAluno";
 import CriarTreinamento from "./pages/Gerenciar-Treinamentos/Novo-Treinamento";
 import TreinamentoAluno from "./pages/Treinamentos/Treinamento-Detalhe";
 
@@ -37,6 +38,7 @@ function App() {
             path="gerenciar-treinamentos/novo-treinamento"
             element={<CriarTreinamento />}
           />
+          <Route path="gerenciar-treinamentos/:id/adicionar-alunos" element={<AdicionarAluno />} />
           <Route
             path="gerenciar-treinamentos/:id"
             element={<TreinamentoDetalhes />}

@@ -1,8 +1,10 @@
 import { Card, Button } from "@heroui/react";
 import { trainingsMock } from "../../../mock";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import AlunoCollapsible from "../AlunoCollapsible";
 
 export default function TreinamentoDetalhes() {
+  const navigate = useNavigate();
   const { id } = useParams();
   // mock simples (depois tu pega pelo ID via params)
   const training = trainingsMock.find((t) => t.id === Number(id));
@@ -10,11 +12,56 @@ export default function TreinamentoDetalhes() {
   if (!training) return <div>Nenhum treinamento com esse id</div>;
 
   const alunosMock = [
-    { nome: "João Silva", status: "concluido" },
-    { nome: "Maria Souza", status: "em_andamento" },
-    { nome: "Carlos Lima", status: "nao_iniciado" },
-    { nome: "Ana Costa", status: "incompleto" },
-    { nome: "Lucas Alves", status: "em_andamento" },
+    {
+      nome: "João Silva",
+      status: "concluido",
+      progress: 96,
+      notaMedia: "9.4",
+      ultimaAtividade: "Quiz Final",
+      tarefasConcluidas: 12,
+      totalTarefas: 12,
+      comentarios: "Excelente desempenho nas últimas avaliações.",
+    },
+    {
+      nome: "Maria Souza",
+      status: "em_andamento",
+      progress: 72,
+      notaMedia: "8.2",
+      ultimaAtividade: "Estudo de caso",
+      tarefasConcluidas: 8,
+      totalTarefas: 11,
+      comentarios: "Bom ritmo, faltam apenas duas atividades.",
+    },
+    {
+      nome: "Carlos Lima",
+      status: "nao_iniciado",
+      progress: 10,
+      notaMedia: "6.0",
+      ultimaAtividade: "Introdução ao curso",
+      tarefasConcluidas: 1,
+      totalTarefas: 10,
+      comentarios: "Ainda não avançou muito no conteúdo.",
+    },
+    {
+      nome: "Ana Costa",
+      status: "incompleto",
+      progress: 43,
+      notaMedia: "7.1",
+      ultimaAtividade: "Aula 4",
+      tarefasConcluidas: 5,
+      totalTarefas: 12,
+      comentarios: "Precisa revisar alguns módulos para completar o curso.",
+    },
+    {
+      nome: "Lucas Alves",
+      status: "em_andamento",
+      progress: 58,
+      notaMedia: "7.8",
+      ultimaAtividade: "Prática final",
+      tarefasConcluidas: 7,
+      totalTarefas: 12,
+      comentarios: "Avançando bem, mas com margem para melhorar.",
+    },
   ];
 
   const avaliacoesMock = [
@@ -31,21 +78,6 @@ export default function TreinamentoDetalhes() {
       data: "30/06",
     },
   ];
-
-  const getStatusStyle = (status: string) => {
-    switch (status) {
-      case "concluido":
-        return "bg-green-100 text-green-700";
-      case "em_andamento":
-        return "bg-yellow-100 text-yellow-700";
-      case "nao_iniciado":
-        return "bg-gray-200 text-gray-700";
-      case "incompleto":
-        return "bg-red-100 text-red-700";
-      default:
-        return "bg-gray-200 text-gray-700";
-    }
-  };
 
   return (
     <div className="p-8 bg-neutral-50 min-h-screen">
@@ -94,32 +126,18 @@ export default function TreinamentoDetalhes() {
             </span>
           </div>
 
+          <div className="flex justify-end mb-4">
+            <Button
+              className="bg-primary text-white"
+              onPress={() => navigate(`/painel/gerenciar-treinamentos/${training.id}/adicionar-alunos`)}
+            >
+              Adicionar Alunos +
+            </Button>
+          </div>
+
           <div className="flex flex-col gap-3">
-            {alunosMock.map((aluno, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between bg-neutral-50 p-3 rounded-md"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-primary rounded-full" />
-
-                  <span className="font-medium text-neutral-800">
-                    {aluno.nome}
-                  </span>
-
-                  <span
-                    className={`text-xs px-2 py-1 rounded-full ${getStatusStyle(
-                      aluno.status,
-                    )}`}
-                  >
-                    {aluno.status.replace("_", " ")}
-                  </span>
-                </div>
-
-                <Button size="sm" className="bg-primary text-white">
-                  Ver mais
-                </Button>
-              </div>
+            {alunosMock.map((aluno) => (
+              <AlunoCollapsible key={aluno.nome} aluno={aluno} />
             ))}
           </div>
         </Card>
