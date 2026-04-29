@@ -1,20 +1,21 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Button, Input, Card } from "@heroui/react";
 import type { Training } from "../../types/Training";
-
 import { trainingsMock } from "../../mock";
+import { useNavigate } from "react-router-dom"; // 👈 add
 
 type StatusFilter = "todos" | "em_andamento" | "concluido" | "oculto";
 
 export const Treinamentos = () => {
-  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<StatusFilter>("todos");
   const [trainings, setTrainings] = useState<Training[]>(trainingsMock);
 
+  const navigate = useNavigate(); // 👈 add
+
   useEffect(() => {
     let result = trainingsMock;
+
     if (searchTerm !== "") {
       result = result.filter((training) =>
         training.title.toLowerCase().includes(searchTerm.toLowerCase()),
@@ -28,6 +29,10 @@ export const Treinamentos = () => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setTrainings(result);
   }, [selectedStatus, searchTerm]);
+
+  const handleClick = (id: number) => {
+    navigate(`/painel/treinamentos/${id}`); // 👈 rota de detalhes
+  };
 
   const getButtonStyle = (training: Training) => {
     switch (training.status) {
@@ -61,27 +66,17 @@ export const Treinamentos = () => {
           bgColor: "#BDBDBD",
           text: "Concluído",
         };
-      case "oculto":
-        return {
-          bgColor: "#BDBDBD",
-          text: "Oculto",
-        };
-      default:
-        return {
-          bgColor: "#BDBDBD",
-          text: "Sem ação",
-        };
     }
   };
 
   const getProgressBarColor = (status: Training["status"]) => {
     switch (status) {
       case "pre_avaliacao":
-        return "#006FEE";
+        return "bg-primary";
       case "em_andamento":
         return "#F5A623";
       case "avaliacao":
-        return "#006FEE";
+        return "bg-primary";
       case "aguardando_feedback":
         return "#BDBDBD";
       case "concluido":
@@ -90,20 +85,6 @@ export const Treinamentos = () => {
         return "#F5A623";
       default:
         return "#F5A623";
-    }
-  };
-
-  const getInitialTab = (status: Training["status"]) => {
-    switch (status) {
-      case "pre_avaliacao":
-        return "pre-teste";
-      case "avaliacao":
-      case "concluido":
-      case "pendencia":
-      case "aguardando_feedback":
-        return "pos-teste";
-      default:
-        return "pre-teste";
     }
   };
 
@@ -121,46 +102,20 @@ export const Treinamentos = () => {
       </div>
 
       <div className="flex gap-3 flex-wrap mb-8">
-        <button
-          onClick={() => setSelectedStatus("todos")}
-          className={`cursor-pointer px-6 py-2 rounded-full font-semibold transition-all ${
-            selectedStatus === "todos"
-              ? "bg-blue-500 text-white"
-              : "bg-white text-primary border-2 border-primary hover:bg-primary-50"
-          }`}
-        >
-          Todos
-        </button>
-        <button
-          onClick={() => setSelectedStatus("em_andamento")}
-          className={`cursor-pointer px-6 py-2 rounded-full font-semibold transition-all ${
-            selectedStatus === "em_andamento"
-              ? "bg-primary text-white"
-              : "bg-white text-primary border-2 border-primary hover:bg-primary-50"
-          }`}
-        >
-          Em Andamento
-        </button>
-        <button
-          onClick={() => setSelectedStatus("concluido")}
-          className={`cursor-pointer px-6 py-2 rounded-full font-semibold transition-all ${
-            selectedStatus === "concluido"
-              ? "bg-primary text-white"
-              : "bg-white text-primary border-2 border-primary hover:bg-primary-50"
-          }`}
-        >
-          Concluído
-        </button>
-        <button
-          onClick={() => setSelectedStatus("oculto")}
-          className={`cursor-pointer px-6 py-2 rounded-full font-semibold transition-all ${
-            selectedStatus === "oculto"
-              ? "bg-primary text-white"
-              : "bg-white text-primary border-2 border-primary hover:bg-primary-50"
-          }`}
-        >
-          Ocultos
-        </button>
+        {/* filtros (mantidos iguais) */}
+        {["todos", "em_andamento", "concluido", "oculto"].map((status) => (
+          <button
+            key={status}
+            onClick={() => setSelectedStatus(status as StatusFilter)}
+            className={`cursor-pointer px-6 py-2 rounded-full font-semibold transition-all ${
+              selectedStatus === status
+                ? "bg-primary text-white"
+                : "bg-white text-primary border-2 border-primary hover:bg-primary-50"
+            }`}
+          >
+            {status.replace("_", " ")}
+          </button>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -171,29 +126,18 @@ export const Treinamentos = () => {
           return (
             <Card
               key={training.id}
-              className="overflow-hidden shadow-md hover:shadow-lg transition-shadow rounded-md p-0"
+              onClick={() => handleClick(training.id)} // 👈 click no card
+              className="overflow-hidden shadow-md hover:shadow-lg transition-shadow rounded-md p-0 cursor-pointer"
             >
               <div className="w-full h-40 bg-linear-to-br from-primary-200 to-primary-400 relative flex items-start justify-end p-4">
-                <button className="bg-neutral-300 hover:bg-neutral-400 text-neutral-700 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 transition-colors">
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                    />
-                  </svg>
+                {/* botão não propaga clique */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation(); // 👈 ESSENCIAL
+                    console.log("ocultar", training.id);
+                  }}
+                  className="bg-neutral-300 hover:bg-neutral-400 text-neutral-700 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 transition-colors"
+                >
                   Ocultar
                 </button>
               </div>
@@ -204,19 +148,6 @@ export const Treinamentos = () => {
                 </h3>
 
                 <div className="flex items-center gap-2 text-neutral-600">
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
                   <span className="font-medium">{training.hours} horas</span>
                 </div>
 
@@ -226,6 +157,7 @@ export const Treinamentos = () => {
                       Progresso: {training.progress}%
                     </span>
                   </div>
+
                   <div className="w-full bg-neutral-300 rounded-full h-2 overflow-hidden">
                     <div
                       className="h-full transition-all rounded-full"
@@ -233,56 +165,30 @@ export const Treinamentos = () => {
                         width: `${training.progress}%`,
                         backgroundColor: progressColor,
                       }}
-                    ></div>
+                    />
                   </div>
                 </div>
 
-                {/* Datas */}
                 <div className="flex gap-4 text-sm">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-2 h-2 rounded-full"
-                      style={{ backgroundColor: "#F5A623" }}
-                    ></span>
-                    <span className="text-neutral-600">
-                      <strong>Início:</strong> {training.startDate}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-2 h-2 rounded-full"
-                      style={{ backgroundColor: "#F5A623" }}
-                    ></span>
-                    <span className="text-neutral-600">
-                      <strong>Término:</strong> {training.endDate}
-                    </span>
-                  </div>
+                  <span className="text-neutral-600">
+                    <strong>Início:</strong> {training.startDate}
+                  </span>
+                  <span className="text-neutral-600">
+                    <strong>Término:</strong> {training.endDate}
+                  </span>
                 </div>
 
                 <Button
-                  className="w-full text-white font-semibold rounded-md transition-all text-base h-auto min-h-12 px-4 py-3 text-center whitespace-normal"
-                  style={{
-                    backgroundColor: buttonStyle.bgColor,
-                  }}
-                  onClick={() =>
-                    navigate(`/painel/treinamentos/${training.id}`, {
-                      state: { initialTab: getInitialTab(training.status) },
-                    })
-                  }
+                  className="w-full text-white font-semibold py-3 rounded-md"
+                  style={{ backgroundColor: buttonStyle?.bgColor }}
                 >
-                  {buttonStyle.text}
+                  {buttonStyle?.text}
                 </Button>
               </div>
             </Card>
           );
         })}
       </div>
-
-      {trainings.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-neutral-600">Nenhum treinamento encontrado</p>
-        </div>
-      )}
     </div>
   );
 };

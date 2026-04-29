@@ -122,7 +122,9 @@ export const GerenciarTreinamentos = () => {
 
         <Button
           className="bg-primary text-white"
-          onPress={() => alert("Criar treinamento (depois tu faz a página)")}
+          onPress={() => {
+            navigate("/painel/gerenciar-treinamentos/novo-treinamento")  
+          }}
         >
           + Novo Treinamento
         </Button>
