@@ -51,10 +51,17 @@ export const GerenciarTreinamentos = () => {
   const getButtonStyle = (training: Training) => {
     switch (training.status) {
       case "em_andamento":
-        return {
-          bgColor: "#F5A623",
-          text: `Expira em ${training.daysLeft} dias`,
-        };
+        if (training.daysLeft) {
+          return {
+            bgColor: "#F5A623",
+            text: `Expira em ${training.daysLeft} dias`,
+          };
+        } else {
+          return {
+            bgColor: "#006FEE",
+            text: "Em Andamento",
+          };
+        }
       case "avaliacao":
         return {
           bgColor: "#17C964",
@@ -91,11 +98,11 @@ export const GerenciarTreinamentos = () => {
   const getProgressBarColor = (status: Training["status"]) => {
     switch (status) {
       case "pre_avaliacao":
-        return "bg-primary";
+        return "#176dc9";
       case "em_andamento":
         return "#F5A623";
       case "avaliacao":
-        return "bg-primary";
+        return "#006FEE";
       case "aguardando_feedback":
         return "#BDBDBD";
       case "concluido":
