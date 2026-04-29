@@ -9,4 +9,5 @@ export type User = {
   telefone: string;
   cargo: Cargo;
   permissoes: Permission[];
+  foto?: string;
 };

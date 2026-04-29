@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button, Input, Card } from "@heroui/react";
+import { Clock } from "lucide-react";
 import type { Training } from "../../types/Training";
 import { trainingsMock } from "../../mock";
 import { useNavigate } from "react-router-dom"; // 👈 add
@@ -37,10 +38,17 @@ export const Treinamentos = () => {
   const getButtonStyle = (training: Training) => {
     switch (training.status) {
       case "em_andamento":
-        return {
-          bgColor: "#F5A623",
-          text: `Expira em ${training.daysLeft} dias`,
-        };
+        if (training.daysLeft) {
+          return {
+            bgColor: "#F5A623",
+            text: `Expira em ${training.daysLeft} dias`,
+          };
+        } else {
+          return {
+            bgColor: "#006FEE",
+            text: "Em Andamento",
+          };
+        }
       case "avaliacao":
         return {
           bgColor: "#17C964",
@@ -69,14 +77,15 @@ export const Treinamentos = () => {
     }
   };
 
-  const getProgressBarColor = (status: Training["status"]) => {
-    switch (status) {
+  const getProgressBarColor = (training: Training) => {
+    switch (training.status) {
       case "pre_avaliacao":
-        return "bg-primary";
+        return "#006FEE";
       case "em_andamento":
-        return "#F5A623";
+        // Se houver daysLeft, retorna vermelho, senão azul
+        return training.daysLeft ? "#F5A623" : "#006FEE";
       case "avaliacao":
-        return "bg-primary";
+        return "#006FEE";
       case "aguardando_feedback":
         return "#BDBDBD";
       case "concluido":
@@ -121,7 +130,7 @@ export const Treinamentos = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {trainings.map((training) => {
           const buttonStyle = getButtonStyle(training);
-          const progressColor = getProgressBarColor(training.status);
+          const progressColor = getProgressBarColor(training);
 
           return (
             <Card
@@ -148,6 +157,7 @@ export const Treinamentos = () => {
                 </h3>
 
                 <div className="flex items-center gap-2 text-neutral-600">
+                  <Clock size={18} />
                   <span className="font-medium">{training.hours} horas</span>
                 </div>
 

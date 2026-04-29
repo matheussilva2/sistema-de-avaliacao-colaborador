@@ -1,48 +1,48 @@
-import { useParams } from "react-router-dom";
-
 import { useState } from "react";
-import { Card, Input, Label, Checkbox } from "@heroui/react";
-import type { Permission } from "../../../types/Permission";
+import { useNavigate, useParams } from "react-router-dom";
+import { Card, Input, Label, Button } from "@heroui/react";
 import { colaboradores, trainingsMock } from "../../../mock";
 import { UserCircle2 } from "lucide-react";
 
-const permissionsMock: Permission[] = [
-  {
-    name: "manage_trainings",
-    label: "Gerenciar Treinamentos",
-    isEnabled: true,
-  },
-  {
-    name: "manage_users",
-    label: "Gerenciar usuários",
-    isEnabled: false,
-  },
-];
-
 export default function ColaboradorDetalhe() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const isCreateMode = id === "novo";
 
   const colaborador = colaboradores.find((c) => c.id === Number(id));
 
-  const treinamentos = colaborador?.treinamentosIds.map((tId) => {
+  const treinamentos = colaborador?.treinamentosIds?.map((tId) => {
     return trainingsMock.find((t) => t.id === tId);
+  }) ?? [];
+
+  const [form, setForm] = useState({
+    nome: colaborador?.nome ?? "",
+    sobrenome: colaborador?.sobrenome ?? "",
+    cpf: colaborador?.cpf ?? "",
+    email: colaborador?.email ?? "",
+    telefone: colaborador?.telefone ?? "",
+    cargo: colaborador?.cargo ?? "colaborador",
+    situacao: colaborador?.situacao ?? "Ativo",
+    dataContratacao: "12/03/2022",
+    dataRegistro: "01/01/2022",
   });
 
-  // const [isEditing, setIsEditing] = useState(false);
-  const [permissions, setPermissions] = useState<Permission[]>(permissionsMock);
-
-  const handlePermissionChange = (permissionName: string) => {
-    const updatedPermissions = permissions.map((permission) => {
-      if (permission.name === permissionName) {
-        return { ...permission, isEnabled: !permission.isEnabled };
-      }
-      return permission;
-    });
-
-    setPermissions(updatedPermissions);
+  const handleFieldChange = (field: keyof typeof form, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  if (!colaborador) {
+  const handleSave = () => {
+    const payload = {
+      id: isCreateMode ? Date.now() : colaborador?.id,
+      ...form,
+      treinamentosIds: colaborador?.treinamentosIds ?? [],
+    };
+
+    console.log(isCreateMode ? "NOVO COLABORADOR:" : "COLABORADOR ATUALIZADO:", payload);
+    navigate("/painel/colaboradores");
+  };
+
+  if (!colaborador && !isCreateMode) {
     return <div>Nenhum colaborador com esse id</div>;
   }
 
@@ -55,13 +55,13 @@ export default function ColaboradorDetalhe() {
 
           <div className="text-center flex flex-col gap-2">
             <span className="text-primary-700 text-lg font-bold">
-              {colaborador.nome}
+              {form.nome || "Novo colaborador"}
             </span>
             <span className="text-primary-700 text-sm">
-              {colaborador.cargo}
+              {form.cargo}
             </span>
             <span className="bg-primary-500 rounded-full text-sm text-white py-1 px-3">
-              {colaborador.situacao}
+              {form.situacao}
             </span>
           </div>
         </Card>
@@ -73,12 +73,22 @@ export default function ColaboradorDetalhe() {
           <div className="flex flex-col gap-3 text-sm">
             <div>
               <span className="text-gray-500">Data de contratação</span>
-              <p className="font-medium">12/03/2022</p>
+              <Input
+                type="text"
+                value={form.dataContratacao}
+                onChange={(e) => handleFieldChange("dataContratacao", e.target.value)}
+                className="bg-white mt-1"
+              />
             </div>
 
             <div>
               <span className="text-gray-500">Data de registro</span>
-              <p className="font-medium">01/01/2022</p>
+              <Input
+                type="text"
+                value={form.dataRegistro}
+                onChange={(e) => handleFieldChange("dataRegistro", e.target.value)}
+                className="bg-white mt-1"
+              />
             </div>
           </div>
         </Card>
@@ -104,9 +114,9 @@ export default function ColaboradorDetalhe() {
                   type="text"
                   placeholder="Digite seu nome"
                   className="bg-white"
-                  value={colaborador.nome}
+                  value={form.nome}
+                  onChange={(e) => handleFieldChange("nome", e.target.value)}
                   name="nome"
-                  disabled
                   id="profile_nome_input"
                 />
               </div>
@@ -121,8 +131,8 @@ export default function ColaboradorDetalhe() {
                   type="text"
                   placeholder="Digite seu sobrenome"
                   className="bg-white"
-                  disabled
-                  value={colaborador.sobrenome}
+                  value={form.sobrenome}
+                  onChange={(e) => handleFieldChange("sobrenome", e.target.value)}
                   name="sobrenome"
                   id="profile_sobrenome_input"
                 />
@@ -138,8 +148,8 @@ export default function ColaboradorDetalhe() {
                   type="email"
                   placeholder="Digite seu e-mail"
                   className="bg-white"
-                  disabled
-                  value={colaborador.email}
+                  value={form.email}
+                  onChange={(e) => handleFieldChange("email", e.target.value)}
                   name="email"
                   id="profile_email_input"
                 />
@@ -155,68 +165,20 @@ export default function ColaboradorDetalhe() {
                   type="tel"
                   placeholder="(XX) XXXXX-XXXX"
                   className="bg-white"
-                  disabled
-                  value={colaborador.telefone}
+                  value={form.telefone}
+                  onChange={(e) => handleFieldChange("telefone", e.target.value)}
                   name="telefone"
                   id="profile_telefone_input"
                 />
               </div>
-              {/* <div className="flex flex-col gap-2">
-                  <Label
-                    htmlFor="profile_password_input"
-                    className="text-primary-700 font-semibold text-sm"
-                  >
-                    Alterar Senha
-                  </Label>
-                  <Input
-                    type="text"
-                    placeholder="Nova senha"
-                    className="bg-white"
-                    disabled={!isEditing}
-                    name="password"
-                    id="profile_password_input"
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label
-                    htmlFor="profile_repassword_input"
-                    className="text-primary-700 font-semibold text-sm"
-                  >
-                    Confirmar Senha
-                  </Label>
-                  <Input
-                    type="text"
-                    placeholder="Confirme a senha"
-                    className="bg-white"
-                    disabled={!isEditing}
-                    name="password_confirmation"
-                    id="profile_repassword_input"
-                  />
-                </div> */}
             </form>
-
-            {/* {isEditing ? (
-                <Button
-                  onPress={() => setIsEditing(false)}
-                  className="w-full bg-primary text-white font-semibold mt-6"
-                >
-                  Salvar Alterações
-                </Button>
-              ) : (
-                <Button
-                  onPress={() => setIsEditing(true)}
-                  className="w-full bg-primary text-white font-semibold mt-6"
-                >
-                  Editar Dados
-                </Button>
-              )} */}
           </div>
         </Card>
 
         <Card className="rounded-xl shadow-md overflow-hidden p-0 gap-0">
           <div className="bg-primary p-4">
             <span className="text-white font-semibold text-base">
-              Cargos e Permissões
+              Cargo e Situação
             </span>
           </div>
           <div className="bg-primary-50 p-6">
@@ -227,78 +189,66 @@ export default function ColaboradorDetalhe() {
                 </Label>
                 <Input
                   type="text"
-                  value={colaborador.cargo}
+                  value={form.cargo}
+                  onChange={(e) => handleFieldChange("cargo", e.target.value)}
                   className="bg-white text-black"
-                  disabled
                 />
               </div>
-              <div />
-            </div>
-
-            <div className="mt-6">
-              <h3 className="text-primary-700 font-semibold text-sm mb-4">
-                Permissões
-              </h3>
-              <div className="flex flex-col gap-3 w-full">
-                {colaborador.permissoes.map((permissao) => (
-                  <div key={permissao.name} className="flex items-center gap-2">
-                    <Checkbox
-                      id={`permissions_${permissao.name}`}
-                      isSelected={permissao.isEnabled}
-                      onChange={() => handlePermissionChange(permissao.name)}
-                    >
-                      <Checkbox.Control>
-                        <Checkbox.Indicator />
-                      </Checkbox.Control>
-                    </Checkbox>
-
-                    <label
-                      htmlFor={`permissions_${permissao.name}`}
-                      className="text-gray-700 cursor-pointer"
-                    >
-                      {permissao.label}
-                    </label>
-                  </div>
-                ))}
+              <div className="flex flex-col gap-3">
+                <Label className="text-primary-700 font-semibold text-sm">Situação</Label>
+                <select
+                  value={form.situacao}
+                  onChange={(e) => handleFieldChange("situacao", e.target.value)}
+                  className="bg-white border rounded-xl h-10 px-3"
+                >
+                  <option value="Ativo">Ativo</option>
+                  <option value="Inativo">Inativo</option>
+                </select>
               </div>
             </div>
+
           </div>
         </Card>
 
         <Card className="rounded-xl shadow-md overflow-hidden p-0 gap-0">
-          {" "}
           <div className="bg-primary p-4">
             <span className="text-white font-semibold text-base">
               Treinamentos
             </span>
           </div>
           <div className="bg-primary-50 p-6">
-            {treinamentos && treinamentos.length ? (
+            {!isCreateMode && treinamentos && treinamentos.length ? (
               <ul className="flex flex-col gap-3">
                 {treinamentos.map((t) => (
-                  <>
-                    {t && (
-                      <li
-                        key={t.id}
-                        className="bg-primary-50 rounded-md p-4 border border-primary-500 flex flex-col gap-3"
-                      >
-                        <h2 className="text-xl text-primary-500">{t.title}</h2>
-                        <span className="text-black">{t.status}</span>
-                        <button className="bg-primary-500 w-fit px-4 py-1 rounded-full text-white text-sm hover:bg-primary-300 cursor-pointer">
-                          Ver mais
-                        </button>
-                      </li>
-                    )}
-                  </>
+                  t && (
+                    <li
+                      key={t.id}
+                      className="bg-primary-50 rounded-md p-4 border border-primary-500 flex flex-col gap-3"
+                    >
+                      <h2 className="text-xl text-primary-500">{t.title}</h2>
+                      <span className="text-black">{t.status}</span>
+                      <button className="bg-primary-500 w-fit px-4 py-1 rounded-full text-white text-sm hover:bg-primary-300 cursor-pointer">
+                        Ver mais
+                      </button>
+                    </li>
+                  )
                 ))}
               </ul>
             ) : (
               <span className="text-gray-500 text-sm">
-                Nenhum treinamento vinculado
+                {isCreateMode
+                  ? "Vincule treinamentos após salvar o colaborador"
+                  : "Nenhum treinamento vinculado"}
               </span>
             )}
           </div>
         </Card>
+
+        <div className="flex justify-end">
+          <Button className="bg-primary text-white font-semibold px-8" onPress={handleSave}>
+            {isCreateMode ? "Salvar Colaborador" : "Salvar Alterações"}
+          </Button>
+        </div>
       </div>
       {/* </div> */}
     </div>

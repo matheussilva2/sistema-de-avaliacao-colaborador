@@ -8,6 +8,7 @@ export const userMock: User = {
   email: "ana.santos@ufal.br",
   telefone: "(82) 99999-9999",
   cargo: "gerenciador",
+  foto: "https://picsum.photos/seed/ana/500/500",
   permissoes: [
     { name: "verTreinamentos", label: "Ver Treinamentos", isEnabled: true },
     { name: "gerenciarUsuarios", label: "Gerenciar Usuários", isEnabled: true },

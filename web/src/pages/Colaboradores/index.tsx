@@ -22,16 +22,25 @@ export default function Colaboradores() {
   };
   return (
     <div className="p-8 bg-neutral-50 min-h-screen">
-      <div className="mb-6 flex w-full max-w-xl  bg-white pl-4 pr-3 rounded-full items-center gap-2 border border-gray-200 focus-within:border-gray-400 transition">
-        <Search size={18} className="text-gray-400" />
+      <div className="mb-6 flex items-center justify-between gap-4">
+        <div className="flex w-full max-w-xl bg-white pl-4 pr-3 rounded-full items-center gap-2 border border-gray-200 focus-within:border-gray-400 transition">
+          <Search size={18} className="text-gray-400" />
 
-        <input
-          type="text"
-          placeholder="Buscar colaborador..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="bg-transparent w-full py-2 outline-none text-sm placeholder:text-gray-400"
-        />
+          <input
+            type="text"
+            placeholder="Buscar colaborador..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="bg-transparent w-full py-2 outline-none text-sm placeholder:text-gray-400"
+          />
+        </div>
+
+        <Button
+          className="bg-primary text-white font-semibold px-6"
+          onPress={() => navigate("/painel/colaboradores/adicionar")}
+        >
+          + Adicionar Colaborador
+        </Button>
       </div>
 
       <div className="bg-white rounded-md shadow overflow-hidden">
