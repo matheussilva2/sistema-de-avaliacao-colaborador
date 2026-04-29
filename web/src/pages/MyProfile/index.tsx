@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type ChangeEvent, useState } from "react";
 import { Button, Card, Input } from "@heroui/react";
 import { userMock } from "../../mock";
 
@@ -13,6 +13,17 @@ export const MyProfile = () => {
     }));
   };
 
+  const handlePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const imageUrl = URL.createObjectURL(file);
+    setUser((prev) => ({
+      ...prev,
+      foto: imageUrl,
+    }));
+  };
+
   return (
     <div className="p-8 bg-neutral-50 min-h-screen">
       <div className="flex gap-6 mb-8">
@@ -20,10 +31,10 @@ export const MyProfile = () => {
         <div className="w-64">
           <Card className="bg-primary-50 rounded-xl shadow-md p-6 flex flex-col items-center gap-4">
             <img
-              width={80}
-              height={80}
+              width={120}
+              height={120}
               className="rounded-full border-4 border-primary object-cover"
-              src="https://picsum.photos/seed/placeholder/500/500"
+              src={user.foto ?? "https://picsum.photos/seed/placeholder/500/500"}
               alt="Profile"
             />
 
@@ -35,6 +46,18 @@ export const MyProfile = () => {
                 {user.cargo === "gerenciador" ? "Gerenciador" : "Colaborador"}
               </span>
             </div>
+
+            {isEditing && (
+              <label className="cursor-pointer rounded-full border border-primary px-4 py-2 text-primary text-sm hover:bg-primary/10">
+                Alterar foto
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoChange}
+                  className="hidden"
+                />
+              </label>
+            )}
           </Card>
         </div>
 
