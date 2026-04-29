@@ -69,8 +69,8 @@ export default function TreinamentoAluno() {
       <div className="mb-6 border-b border-gray-200 flex gap-6">
         {[
           { key: "pre", label: "Pré-Test" },
-          { key: "satisfacao", label: "Satisfação" },
           { key: "pos", label: "Pós-Teste" },
+          { key: "satisfacao", label: "Satisfação" },
           { key: "resultado", label: "Resultados" },
         ].map((tab) => (
           <button
