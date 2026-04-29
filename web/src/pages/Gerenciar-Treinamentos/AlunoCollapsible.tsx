@@ -4,6 +4,7 @@ import { Button } from "@heroui/react";
 export type AlunoProgress = {
   nome: string;
   status: string;
+  foto?: string;
   progress: number;
   notaMedia: string;
   ultimaAtividade: string;
@@ -18,6 +19,7 @@ type Props = {
 
 export default function AlunoCollapsible({ aluno }: Props) {
   const [isOpen, setIsOpen] = useState(false);
+  const [comentarios, setComentarios] = useState(aluno.comentarios);
 
   const statusLabel = aluno.status.replace("_", " ");
 
@@ -34,7 +36,15 @@ export default function AlunoCollapsible({ aluno }: Props) {
     <div className="rounded-3xl border border-gray-200 bg-white shadow-sm overflow-hidden">
       <div className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-primary" />
+          {aluno.foto ? (
+            <img
+              src={aluno.foto}
+              alt={aluno.nome}
+              className="w-10 h-10 rounded-full object-cover"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-primary" />
+          )}
           <div>
             <p className="font-semibold text-neutral-900">{aluno.nome}</p>
             <div className="flex flex-wrap items-center gap-2 mt-1 text-sm">
@@ -86,8 +96,15 @@ export default function AlunoCollapsible({ aluno }: Props) {
               </p>
             </div>
             <div className="rounded-2xl bg-white p-4 shadow-sm">
-              <p className="text-sm text-neutral-500">Comentários do aluno</p>
-              <p className="mt-2 text-neutral-900">{aluno.comentarios}</p>
+              <label className="text-sm text-neutral-500 block mb-2">
+                Comentários do aluno
+              </label>
+              <textarea
+                value={comentarios}
+                onChange={(event) => setComentarios(event.target.value)}
+                className="w-full rounded-xl border border-gray-200 bg-neutral-50 p-3 text-sm text-neutral-900 focus:border-primary focus:outline-none"
+                rows={4}
+              />
             </div>
           </div>
         </div>

@@ -14,6 +14,7 @@ export default function TreinamentoDetalhes() {
   const alunosMock = [
     {
       nome: "João Silva",
+      foto: "https://picsum.photos/seed/joao/80/80",
       status: "concluido",
       progress: 96,
       notaMedia: "9.4",
@@ -24,6 +25,7 @@ export default function TreinamentoDetalhes() {
     },
     {
       nome: "Maria Souza",
+      foto: "https://picsum.photos/seed/maria/80/80",
       status: "em_andamento",
       progress: 72,
       notaMedia: "8.2",
@@ -34,6 +36,7 @@ export default function TreinamentoDetalhes() {
     },
     {
       nome: "Carlos Lima",
+      foto: "https://picsum.photos/seed/carlos/80/80",
       status: "nao_iniciado",
       progress: 10,
       notaMedia: "6.0",
@@ -44,6 +47,7 @@ export default function TreinamentoDetalhes() {
     },
     {
       nome: "Ana Costa",
+      foto: "https://picsum.photos/seed/ana/80/80",
       status: "incompleto",
       progress: 43,
       notaMedia: "7.1",
@@ -54,6 +58,7 @@ export default function TreinamentoDetalhes() {
     },
     {
       nome: "Lucas Alves",
+      foto: "https://picsum.photos/seed/lucas/80/80",
       status: "em_andamento",
       progress: 58,
       notaMedia: "7.8",
@@ -150,16 +155,19 @@ export default function TreinamentoDetalhes() {
 
           <div className="flex flex-col gap-3">
             {avaliacoesMock.map((av, index) => (
-              <div key={index} className="bg-neutral-50 p-4 rounded-md">
+              <div
+                key={index}
+                className="bg-neutral-100 border-2 border-gray-300 p-4 rounded-xl"
+              >
                 <p className="font-semibold text-neutral-900">{av.titulo}</p>
 
-                <p className="text-sm text-neutral-600">Tipo: {av.tipo}</p>
+                <p className="text-sm text-neutral-700">Tipo: {av.tipo}</p>
 
-                <p className="text-sm text-neutral-600">
+                <p className="text-sm text-neutral-700">
                   Acertos necessários: {av.acertos}
                 </p>
 
-                <p className="text-sm text-neutral-600">Data: {av.data}</p>
+                <p className="text-sm text-neutral-700">Data: {av.data}</p>
               </div>
             ))}
           </div>

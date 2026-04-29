@@ -52,17 +52,17 @@ export default function AdicionarAluno() {
       </div>
 
       <div className="grid grid-cols-1 gap-6">
-        <div className="rounded-3xl bg-white shadow-sm p-6">
+        <div className="rounded-3xl bg-white shadow-sm border-4 border-gray-200 p-6">
           <div className="flex flex-col gap-4">
             {colaboradoresMock.map((colaborador) => {
               const isSelected = selectedIds.includes(colaborador.id);
               return (
                 <div
                   key={colaborador.id}
-                  className={`rounded-2xl border p-4 transition-colors ${
+                  className={`rounded-2xl border-4 p-4 transition-colors ${
                     isSelected
                       ? "border-green-500 bg-green-50"
-                      : "border-gray-200 bg-white hover:bg-gray-50"
+                      : "border-gray-300 bg-white hover:bg-gray-50"
                   }`}
                 >
                   <div className="flex items-center justify-between gap-4">
