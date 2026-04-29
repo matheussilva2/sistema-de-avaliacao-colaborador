@@ -3,7 +3,7 @@ import { Card, Input, Button } from "@heroui/react";
 import { useNavigate } from "react-router-dom";
 
 // Tipagens para o formulário de perguntas
-type Option = { id: string; text: string };
+type Option = { id: string; text: string; isCorrect: boolean };
 type Question = { id: string; title: string; options: Option[] };
 
 export default function CriarTreinamento() {
@@ -16,6 +16,7 @@ export default function CriarTreinamento() {
     startDate: "",
     endDate: "",
     testType: "pre-teste",
+    minCorrect: "70",
     description: "",
   });
 
@@ -35,7 +36,7 @@ export default function CriarTreinamento() {
     const newQuestion: Question = {
       id: Date.now().toString(),
       title: "",
-      options: [{ id: Date.now().toString() + "-opt", text: "" }],
+      options: [{ id: Date.now().toString() + "-opt", text: "", isCorrect: false }],
     };
     setQuestions([...questions, newQuestion]);
   };
@@ -56,7 +57,7 @@ export default function CriarTreinamento() {
         if (q.id === qId) {
           return {
             ...q,
-            options: [...q.options, { id: Date.now().toString(), text: "" }],
+            options: [...q.options, { id: Date.now().toString(), text: "", isCorrect: false }],
           };
         }
         return q;
@@ -72,6 +73,22 @@ export default function CriarTreinamento() {
             ...q,
             options: q.options.map((o) =>
               o.id === optId ? { ...o, text: value } : o
+            ),
+          };
+        }
+        return q;
+      })
+    );
+  };
+
+  const handleToggleCorrectOption = (qId: string, optId: string) => {
+    setQuestions(
+      questions.map((q) => {
+        if (q.id === qId) {
+          return {
+            ...q,
+            options: q.options.map((o) =>
+              o.id === optId ? { ...o, isCorrect: !o.isCorrect } : o
             ),
           };
         }
@@ -105,6 +122,8 @@ export default function CriarTreinamento() {
       startDate: form.startDate,
       endDate: form.endDate,
       description: form.description,
+      testType: form.testType,
+      minCorrect: Number(form.minCorrect),
       progress: 0,
       daysLeft: 0,
       status: "em_andamento",
@@ -193,6 +212,25 @@ export default function CriarTreinamento() {
               </div>
             </div>
 
+            {/* MÍNIMO DE ACERTOS PARA APROVAÇÃO */}
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-neutral-700" htmlFor="minCorrect">
+                Mínimo de acertos para ser aprovado
+              </label>
+              <select
+                id="minCorrect"
+                value={form.minCorrect}
+                onChange={(e) => handleChange("minCorrect", e.target.value)}
+                className="bg-white border-2 border-neutral-300 rounded-md p-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="50">50% de acertos</option>
+                <option value="60">60% de acertos</option>
+                <option value="70">70% de acertos</option>
+                <option value="80">80% de acertos</option>
+                <option value="90">90% de acertos</option>
+              </select>
+            </div>
+
             {/* DESCRIÇÃO */}
             <textarea
               placeholder="Descrição do treinamento..."
@@ -244,6 +282,16 @@ export default function CriarTreinamento() {
                         onChange={(e) => handleOptionChange(q.id, opt.id, e.target.value)}
                         className="bg-white flex-1 border-2 border-neutral-300 focus:border-primary focus:ring-2 focus:ring-primary/20"
                       />
+
+                      <label className="inline-flex items-center gap-2 text-sm text-neutral-700">
+                        <input
+                          type="checkbox"
+                          checked={opt.isCorrect}
+                          onChange={() => handleToggleCorrectOption(q.id, opt.id)}
+                          className="h-4 w-4 rounded border-neutral-300 text-primary accent-primary"
+                        />
+                        Correta
+                      </label>
                       
                       {/* Botão de remover opção (só aparece se houver mais de 1 opção) */}
                       {q.options.length > 1 && (
