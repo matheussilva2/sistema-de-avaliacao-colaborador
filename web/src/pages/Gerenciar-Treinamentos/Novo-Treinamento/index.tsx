@@ -7,6 +7,7 @@ import type { Question, TestType, TrainingFormData } from "./types";
 
 export default function CriarTreinamento() {
   const navigate = useNavigate();
+  const [trainingImage, setTrainingImage] = useState<File | null>(null);
 
   // Estado das informações básicas
   const [form, setForm] = useState<TrainingFormData>({
@@ -146,6 +147,7 @@ export default function CriarTreinamento() {
       status: "em_andamento",
       preTestQuestions: testForms["pre-teste"],
       posTestQuestions: testForms["pos-teste"],
+      coverImageName: trainingImage?.name ?? null,
     };
 
     console.log("NOVO TREINAMENTO:", newTraining);
@@ -157,7 +159,12 @@ export default function CriarTreinamento() {
   return (
     <div className="p-8 bg-neutral-50 min-h-screen">
       <div className="max-w-3xl mx-auto flex flex-col gap-6">
-        <BasicTrainingForm form={form} onChange={handleChange} />
+        <BasicTrainingForm
+          form={form}
+          onChange={handleChange}
+          selectedImageName={trainingImage?.name}
+          onImageChange={setTrainingImage}
+        />
 
         <TestFormSection
           testType={form.testType}
