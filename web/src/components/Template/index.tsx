@@ -12,6 +12,13 @@ function getTitle(pathname: string) {
   if (pathname === "/painel/meu-perfil") return "Meu Perfil";
   if (pathname === "/painel/colaboradores") return "Colaboradores";
 
+  if (
+    pathname === "/painel/colaboradores/adicionar" ||
+    pathname === "/painel/colaboradores/novo"
+  ) {
+    return "Adicionar Colaborador";
+  }
+
   if (pathname.startsWith("/painel/colaboradores/")) {
     return "Detalhes do Colaborador";
   }

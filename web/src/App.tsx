@@ -6,6 +6,7 @@ import { MyProfile } from "./pages/MyProfile";
 import { Treinamentos } from "./pages/Treinamentos";
 import Colaboradores from "./pages/Colaboradores";
 import ColaboradorDetalhe from "./pages/Colaboradores/Detalhe";
+import AdicionarColaborador from "./pages/Colaboradores/AdicionarColaborador";
 import Inicio from "./pages/Inicio";
 import { GerenciarTreinamentos } from "./pages/Gerenciar-Treinamentos";
 import TreinamentoDetalhes from "./pages/Gerenciar-Treinamentos/Treinamento-Detalhe";
@@ -21,6 +22,8 @@ function App() {
           <Route index element={<Inicio />} />
           <Route path="meu-perfil" element={<MyProfile />} />
           <Route path="colaboradores" element={<Colaboradores />} />
+          <Route path="colaboradores/adicionar" element={<AdicionarColaborador />} />
+          <Route path="colaboradores/novo" element={<AdicionarColaborador />} />
           <Route path="colaboradores/:id" element={<ColaboradorDetalhe />} />
           <Route path="treinamentos" element={<Treinamentos />} />
           <Route path="treinamentos/:id" element={<TreinamentoAluno />} />
