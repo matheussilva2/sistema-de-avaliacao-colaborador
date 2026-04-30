@@ -227,9 +227,13 @@ export default function ColaboradorDetalhe() {
                     >
                       <h2 className="text-xl text-primary-500">{t.title}</h2>
                       <span className="text-black">{t.status}</span>
-                      <button className="bg-primary-500 w-fit px-4 py-1 rounded-full text-white text-sm hover:bg-primary-300 cursor-pointer">
-                        Ver mais
-                      </button>
+                      <button
+                    type="button"
+                    onClick={() => navigate(`/painel/treinamentos/${t.id}`)}
+                    className="bg-primary-500 w-fit px-4 py-1 rounded-full text-white text-sm hover:bg-primary-300 cursor-pointer"
+                  >
+                    Visualizar treinamento
+                  </button>
                     </li>
                   )
                 ))}
