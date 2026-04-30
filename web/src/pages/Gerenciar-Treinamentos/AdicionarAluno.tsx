@@ -69,7 +69,7 @@ export default function AdicionarAluno() {
                     <button
                       type="button"
                       onClick={() => toggleSelect(colaborador.id)}
-                      className="flex items-center gap-4 text-left w-full"
+                      className="flex items-center gap-4 text-left w-full cursor-pointer"
                     >
                       <img
                         src={`https://picsum.photos/seed/colaborador${colaborador.id}/64/64`}
@@ -150,7 +150,7 @@ export default function AdicionarAluno() {
                       <button
                         type="button"
                         onClick={() => handleRemove(colaborador.id)}
-                        className="text-red-600 font-semibold px-2 py-1 rounded-full hover:bg-red-100"
+                        className="text-red-600 font-semibold px-2 py-1 rounded-full hover:bg-red-100 cursor-pointer"
                       >
                         ×
                       </button>

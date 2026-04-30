@@ -14,6 +14,7 @@ export const GerenciarTreinamentos = () => {
 
   const [allTrainings, setAllTrainings] = useState<Training[]>(trainingsMock);
   const [trainings, setTrainings] = useState<Training[]>(trainingsMock);
+  const [hiddenStatusMap, setHiddenStatusMap] = useState<Record<number, Training["status"]>>({});
 
   const navigate = useNavigate();
 
@@ -26,8 +27,12 @@ export const GerenciarTreinamentos = () => {
       );
     }
 
-    if (selectedStatus !== "todos") {
+    if (selectedStatus === "oculto") {
+      result = result.filter((training) => training.status === "oculto");
+    } else if (selectedStatus !== "todos") {
       result = result.filter((training) => training.status === selectedStatus);
+    } else {
+      result = result.filter((training) => training.status !== "oculto");
     }
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -36,16 +41,25 @@ export const GerenciarTreinamentos = () => {
 
   // 🔥 ocultar treinamento
   const toggleOculto = (id: number) => {
-    setAllTrainings((prev) =>
-      prev.map((t) =>
-        t.id === id
-          ? {
-              ...t,
-              status: t.status === "oculto" ? "em_andamento" : "oculto",
-            }
-          : t,
-      ),
-    );
+    const training = allTrainings.find((t) => t.id === id);
+    if (!training) return;
+
+    if (training.status === "oculto") {
+      const originalStatus = hiddenStatusMap[id] ?? "em_andamento";
+      setAllTrainings((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, status: originalStatus } : t)),
+      );
+      setHiddenStatusMap((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    } else {
+      setHiddenStatusMap((prev) => ({ ...prev, [id]: training.status }));
+      setAllTrainings((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, status: "oculto" } : t)),
+      );
+    }
   };
 
   const getButtonStyle = (training: Training) => {
@@ -197,6 +211,7 @@ export const GerenciarTreinamentos = () => {
                 <Button
                   className="w-full text-white font-semibold py-3 rounded-md"
                   style={{ backgroundColor: buttonStyle.bgColor }}
+                  onPress={() => navigate(`/painel/gerenciar-treinamentos/${training.id}`)}
                 >
                   {buttonStyle.text}
                 </Button>

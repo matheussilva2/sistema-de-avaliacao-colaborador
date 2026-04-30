@@ -10,12 +10,14 @@ type StatusFilter = "todos" | "em_andamento" | "concluido" | "oculto";
 export const Treinamentos = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<StatusFilter>("todos");
-  const [trainings, setTrainings] = useState<Training[]>(trainingsMock);
+  const [allTrainings, setAllTrainings] = useState<Training[]>(trainingsMock);
+  const [trainings, setTrainings] = useState<Training[]>([]);
+  const [hiddenStatusMap, setHiddenStatusMap] = useState<Record<number, Training["status"]>>({});
 
   const navigate = useNavigate(); // 👈 add
 
   useEffect(() => {
-    let result = trainingsMock;
+    let result = allTrainings;
 
     if (searchTerm !== "") {
       result = result.filter((training) =>
@@ -23,16 +25,42 @@ export const Treinamentos = () => {
       );
     }
 
-    if (selectedStatus !== "todos") {
+    if (selectedStatus === "oculto") {
+      result = result.filter((training) => training.status === "oculto");
+    } else if (selectedStatus !== "todos") {
       result = result.filter((training) => training.status === selectedStatus);
+    } else {
+      result = result.filter((training) => training.status !== "oculto");
     }
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setTrainings(result);
-  }, [selectedStatus, searchTerm]);
+  }, [selectedStatus, searchTerm, allTrainings]);
 
   const handleClick = (id: number) => {
     navigate(`/painel/treinamentos/${id}`); // 👈 rota de detalhes
+  };
+
+  const toggleOculto = (id: number) => {
+    const training = allTrainings.find((t) => t.id === id);
+    if (!training) return;
+
+    if (training.status === "oculto") {
+      const originalStatus = hiddenStatusMap[id] ?? "em_andamento";
+      setAllTrainings((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, status: originalStatus } : t)),
+      );
+      setHiddenStatusMap((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    } else {
+      setHiddenStatusMap((prev) => ({ ...prev, [id]: training.status }));
+      setAllTrainings((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, status: "oculto" } : t)),
+      );
+    }
   };
 
   const getButtonStyle = (training: Training) => {
@@ -73,6 +101,11 @@ export const Treinamentos = () => {
         return {
           bgColor: "#BDBDBD",
           text: "Concluído",
+        };
+      case "oculto":
+        return {
+          bgColor: "#999",
+          text: "Oculto",
         };
     }
   };
@@ -142,12 +175,12 @@ export const Treinamentos = () => {
                 {/* botão não propaga clique */}
                 <button
                   onClick={(e) => {
-                    e.stopPropagation(); // 👈 ESSENCIAL
-                    console.log("ocultar", training.id);
+                    e.stopPropagation();
+                    toggleOculto(training.id);
                   }}
                   className="bg-neutral-300 hover:bg-neutral-400 text-neutral-700 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 transition-colors"
                 >
-                  Ocultar
+                  {training.status === "oculto" ? "Mostrar" : "Ocultar"}
                 </button>
               </div>
 
@@ -191,6 +224,7 @@ export const Treinamentos = () => {
                 <Button
                   className="w-full text-white font-semibold py-3 rounded-md"
                   style={{ backgroundColor: buttonStyle?.bgColor }}
+                  onPress={() => handleClick(training.id)}
                 >
                   {buttonStyle?.text}
                 </Button>
