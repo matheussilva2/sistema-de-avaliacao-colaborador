@@ -105,20 +105,24 @@ export function BasicTrainingForm({
 
         <div className="flex flex-col gap-3">
           <span className="text-sm font-medium text-neutral-700">Tipo de avaliação</span>
-          <div className="flex items-center gap-4">
-            {testTypeOptions.map((option) => (
-              <label key={option.value} className="inline-flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="testType"
-                  value={option.value}
-                  checked={form.testType === option.value}
-                  onChange={(e) => onChange("testType", e.target.value)}
-                  className="form-radio h-4 w-4 text-primary accent-primary"
-                />
-                <span className="text-sm text-neutral-700">{option.label}</span>
-              </label>
-            ))}
+          <div className="inline-flex items-center rounded-2xl bg-slate-200 p-1 shadow-sm">
+            {testTypeOptions.map((option) => {
+              const isActive = form.testType === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => onChange("testType", option.value)}
+                  className={`min-w-[120px] rounded-2xl px-4 py-2 text-sm font-semibold transition-all ${
+                    isActive
+                      ? "bg-primary text-white shadow"
+                      : "bg-white text-primary text-opacity-90 hover:bg-primary-50"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>

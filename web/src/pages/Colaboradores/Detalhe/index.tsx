@@ -229,7 +229,7 @@ export default function ColaboradorDetalhe() {
                       <span className="text-black">{t.status}</span>
                       <button
                     type="button"
-                    onClick={() => navigate(`/painel/treinamentos/${t.id}`)}
+                    onClick={() => navigate(`/painel/gerenciar-treinamentos/${t.id}`)}
                     className="bg-primary-500 w-fit px-4 py-1 rounded-full text-white text-sm hover:bg-primary-300 cursor-pointer"
                   >
                     Visualizar treinamento
