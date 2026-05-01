@@ -13,6 +13,8 @@ import TreinamentoDetalhes from "./pages/Gerenciar-Treinamentos/Treinamento-Deta
 import AdicionarAluno from "./pages/Gerenciar-Treinamentos/AdicionarAluno";
 import CriarTreinamento from "./pages/Gerenciar-Treinamentos/Novo-Treinamento";
 import TreinamentoAluno from "./pages/Treinamentos/Treinamento-Detalhe";
+import TreinamentoExecucao from "./pages/Treinamentos/Treinamento-Execucao";
+import TreinamentoResultados from "./pages/Treinamentos/Treinamento-Resultados";
 
 function App() {
   return (
@@ -27,6 +29,8 @@ function App() {
           <Route path="colaboradores/novo" element={<AdicionarColaborador />} />
           <Route path="colaboradores/:id" element={<ColaboradorDetalhe />} />
           <Route path="treinamentos" element={<Treinamentos />} />
+          <Route path="treinamentos/:id/execucao" element={<TreinamentoExecucao />} />
+          <Route path="treinamentos/:id/resultado" element={<TreinamentoResultados />} />
           <Route path="treinamentos/:id" element={<TreinamentoAluno />} />
 
           <Route
