@@ -35,7 +35,7 @@ export default function CriarTreinamento() {
     }));
   };
 
-  // --- FUNÇÕES DO FORMULÁRIO DE PERGUNTAS ---
+  //FUNÇÕES DO FORMULÁRIO DE PERGUNTAS
 
   const handleAddQuestion = () => {
     const newQuestion: Question = {
@@ -129,7 +129,7 @@ export default function CriarTreinamento() {
     }));
   };
 
-  // --- SUBMIT ---
+  //SUBMIT
 
   const handleSubmit = () => {
     // mock de criação

@@ -39,7 +39,7 @@ export const GerenciarTreinamentos = () => {
     setTrainings(result);
   }, [selectedStatus, searchTerm, allTrainings]);
 
-  // 🔥 ocultar treinamento
+  // ocultar treinamento
   const toggleOculto = (id: number) => {
     const training = allTrainings.find((t) => t.id === id);
     if (!training) return;

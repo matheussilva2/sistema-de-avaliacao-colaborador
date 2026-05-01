@@ -3,9 +3,6 @@ import { MenuItem } from "./components/MenuItem";
 import { ArrowLeft, LogOut } from "lucide-react";
 import { userMock } from "../../mock";
 
-// type TemplateGestorProps = {
-//   titulo: string;
-// };
 
 function getTitle(pathname: string) {
   if (pathname === "/painel") return "Início";
@@ -33,33 +30,6 @@ export default function Tamplate() {
 
   const navigate = useNavigate();
 
-  // const menuItemsAdmin = [
-  //     {
-  //         label: "Início",
-  //         link: "/painel"
-  //     },
-  //     {
-  //         label: "Meu Perfil",
-  //         link: "/painel/meu-perfil"
-  //     },
-  //     {
-  //         label: "Colaboradores",
-  //         link: "/painel/colaboradores"
-  //     },
-  //     {
-  //         label: "Treinamentos",
-  //         link: "/painel/treinamentos"
-  //     },
-  //     {
-  //         label: "Gerenciar Treinamento",
-  //         link: "/painel/gerenciar-treinamentos"
-  //     },
-  //     {
-  //         label: "Sair",
-  //         link: "/painel/sair"
-  //     },
-  // ];
-
   const menuItemsColaborador = [
     {
       label: "Início",
@@ -70,10 +40,6 @@ export default function Tamplate() {
       link: "/painel/meu-perfil",
     },
 
-    // {
-    //   label: "Colaboradores",
-    //   link: "/painel/colaboradores",
-    // },
     {
       label: "Meus Treinamentos",
       link: "/painel/treinamentos",
