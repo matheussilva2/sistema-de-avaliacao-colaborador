@@ -2,6 +2,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import "./App.css";
 import Template from "./components/Template";
 import Login from "./pages/Login";
+import CadastroGestor from "./pages/Login/CadastroGestor";
 import { MyProfile } from "./pages/MyProfile";
 import { Treinamentos } from "./pages/Treinamentos";
 import Colaboradores from "./pages/Colaboradores";
@@ -13,12 +14,15 @@ import TreinamentoDetalhes from "./pages/Gerenciar-Treinamentos/Treinamento-Deta
 import AdicionarAluno from "./pages/Gerenciar-Treinamentos/AdicionarAluno";
 import CriarTreinamento from "./pages/Gerenciar-Treinamentos/Novo-Treinamento";
 import TreinamentoAluno from "./pages/Treinamentos/Treinamento-Detalhe";
+import TreinamentoExecucao from "./pages/Treinamentos/Treinamento-Execucao";
+import TreinamentoResultados from "./pages/Treinamentos/Treinamento-Resultados";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route index element={<Login />} />
+        <Route path="cadastro-gestor" element={<CadastroGestor />} />
         <Route path="painel" element={<Template />}>
           <Route index element={<Inicio />} />
           <Route path="meu-perfil" element={<MyProfile />} />
@@ -27,6 +31,8 @@ function App() {
           <Route path="colaboradores/novo" element={<AdicionarColaborador />} />
           <Route path="colaboradores/:id" element={<ColaboradorDetalhe />} />
           <Route path="treinamentos" element={<Treinamentos />} />
+          <Route path="treinamentos/:id/execucao" element={<TreinamentoExecucao />} />
+          <Route path="treinamentos/:id/resultado" element={<TreinamentoResultados />} />
           <Route path="treinamentos/:id" element={<TreinamentoAluno />} />
 
           <Route

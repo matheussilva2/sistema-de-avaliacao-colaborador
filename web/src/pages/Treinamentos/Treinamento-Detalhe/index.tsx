@@ -1,5 +1,5 @@
 import { Card, Button } from "@heroui/react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { trainingsMock } from "../../../mock";
 
@@ -93,92 +93,66 @@ export default function TreinamentoAluno() {
   );
 }
 
-/* ========================= */
-/* PRE TEST */
-/* ========================= */
-
 function PreTest() {
+  const navigate = useNavigate();
+  const { id } = useParams();
+
   return (
     <div className="flex flex-col gap-6">
-
       {/* INFO */}
       <div className="flex gap-4">
         <div className="bg-primary-50 p-4 rounded-md">
           <p className="text-sm text-neutral-600">Acertos</p>
           <p className="font-bold text-lg">0</p>
         </div>
-
         <div className="bg-primary-50 p-4 rounded-md">
           <p className="text-sm text-neutral-600">Mínimo</p>
           <p className="font-bold text-lg">3</p>
         </div>
       </div>
-
-      <FormPerguntas />
+      {/* Caixa para iniciar o treinamento */}
+      <div className="bg-white border border-primary-200 rounded-lg p-6 flex flex-col items-center gap-3 shadow">
+        <p className="text-primary font-semibold text-lg">Pronto para iniciar o treinamento?</p>
+        <Button className="bg-primary text-white px-6 py-2 rounded" onClick={() => navigate(`/painel/treinamentos/${id}/execucao`)}>
+          Ir para o treinamento
+        </Button>
+      </div>
     </div>
   );
 }
 
-/* ========================= */
-/* POS TEST */
-/* ========================= */
 
 function PosTest() {
+  const navigate = useNavigate();
+  const { id } = useParams();
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-primary-50 p-4 rounded-md">
           <p className="text-sm text-neutral-600">Acertos</p>
-          <p className="font-bold text-lg">0</p>
+          <p className="font-bold text-lg">4</p>
         </div>
-
         <div className="bg-primary-50 p-4 rounded-md">
           <p className="text-sm text-neutral-600">Mínimo</p>
           <p className="font-bold text-lg">3</p>
         </div>
       </div>
-
-      <FormPerguntas />
+      <div className="bg-green-50 border border-green-200 rounded-lg p-6 flex flex-col items-center gap-3 shadow">
+        <p className="text-green-700 font-semibold text-lg">Pós-teste concluído! Veja seus resultados abaixo.</p>
+        <Button
+          className="bg-primary text-white px-5 py-2 rounded-lg"
+          onClick={() => navigate(`/painel/treinamentos/${id}/resultado`)}
+        >
+          Ver Resultados
+        </Button>
+      </div>
     </div>
   );
 }
 
-/* ========================= */
-/* FORM PERGUNTAS */
-/* ========================= */
 
-function FormPerguntas() {
-  const perguntas = [1, 2, 3, 4, 5];
-
-  return (
-    <form className="flex flex-col gap-6">
-      {perguntas.map((q) => (
-        <div key={q}>
-          <p className="font-medium mb-2">
-            Pergunta {q}: Lorem ipsum dolor sit amet?
-          </p>
-
-          <div className="flex flex-col gap-1">
-            {["A", "B", "C", "D"].map((opt) => (
-              <label key={opt} className="flex items-center gap-2 text-sm">
-                <input type="radio" name={`q${q}`} />
-                Opção {opt}
-              </label>
-            ))}
-          </div>
-        </div>
-      ))}
-
-      <Button className="bg-primary text-white">
-        Enviar
-      </Button>
-    </form>
-  );
-}
-
-/* ========================= */
-/* SATISFAÇÃO */
-/* ========================= */
+// As perguntas do teste foram movidas para uma página independente de execução.
 
 function Satisfacao() {
   return (
@@ -197,14 +171,10 @@ function Satisfacao() {
   );
 }
 
-
-
 function Resultados() {
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-lg font-semibold text-primary">
-        Resultado Final
-      </p>
+      <p className="text-lg font-semibold text-primary">Resultado Final</p>
 
       <div className="bg-primary-50 p-4 rounded-md">
         <p className="text-sm text-neutral-600">Pré-Test</p>
@@ -212,7 +182,7 @@ function Resultados() {
       </div>
 
       <div className="bg-primary-50 p-4 rounded-md">
-        <p className="text-sm text-neutral-600">Pós-Teste</p>
+        <p className="text-sm text-neutral-600">Pós-Test</p>
         <p className="font-bold">4 / 5</p>
       </div>
 
@@ -223,3 +193,5 @@ function Resultados() {
     </div>
   );
 }
+
+// FormPerguntas removido do fluxo principal, mantido apenas para referência de mock
