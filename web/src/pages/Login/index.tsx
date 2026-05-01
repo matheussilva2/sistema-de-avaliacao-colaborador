@@ -97,6 +97,20 @@ export default function Login() {
               {isLoading ? "Entrando..." : "Entrar"}
             </Button>
           </form>
+
+          {role === "gerenciador" && (
+            <div className="mt-5 text-center">
+              <p className="text-sm text-neutral-600 mb-2">
+                Primeiro acesso? Cadastre-se como gestor.
+              </p>
+              <Button
+                className="bg-white text-primary border border-primary font-semibold px-6"
+                onPress={() => navigate("/cadastro-gestor")}
+              >
+                Cadastrar-se
+              </Button>
+            </div>
+          )}
         </div>
       </Card>
     </main>

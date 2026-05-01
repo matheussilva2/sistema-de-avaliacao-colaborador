@@ -2,6 +2,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import "./App.css";
 import Template from "./components/Template";
 import Login from "./pages/Login";
+import CadastroGestor from "./pages/Login/CadastroGestor";
 import { MyProfile } from "./pages/MyProfile";
 import { Treinamentos } from "./pages/Treinamentos";
 import Colaboradores from "./pages/Colaboradores";
@@ -21,6 +22,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route index element={<Login />} />
+        <Route path="cadastro-gestor" element={<CadastroGestor />} />
         <Route path="painel" element={<Template />}>
           <Route index element={<Inicio />} />
           <Route path="meu-perfil" element={<MyProfile />} />
