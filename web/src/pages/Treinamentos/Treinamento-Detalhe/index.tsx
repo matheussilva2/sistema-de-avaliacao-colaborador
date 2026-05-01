@@ -151,9 +151,6 @@ function PosTest() {
   );
 }
 
-
-// As perguntas do teste foram movidas para uma página independente de execução.
-
 function Satisfacao() {
   return (
     <div className="flex flex-col gap-4">
@@ -193,5 +190,3 @@ function Resultados() {
     </div>
   );
 }
-
-// FormPerguntas removido do fluxo principal, mantido apenas para referência de mock

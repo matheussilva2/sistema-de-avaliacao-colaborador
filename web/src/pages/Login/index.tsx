@@ -36,7 +36,7 @@ export default function Login() {
         </div>
 
         <div className="p-8 bg-white">
-          {/* 🔥 TABS */}
+          {/* TABS */}
           <div className="flex bg-neutral-100 rounded-lg p-1 mb-6">
             <button
               onClick={() => setRole("colaborador")}
