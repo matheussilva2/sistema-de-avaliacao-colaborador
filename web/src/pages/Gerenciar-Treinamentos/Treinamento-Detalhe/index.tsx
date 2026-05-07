@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import AlunoCollapsible from "../AlunoCollapsible";
 import TrainingAnalyticsCharts from "./components/TrainingAnalyticsCharts";
 import { getTrainingAnalyticsById } from "../mocks/trainingAnalytics";
+import { getFormsByTrainingId, trainingFormTypeLabel } from "../mocks/trainingForms";
 
 export default function TreinamentoDetalhes() {
   const navigate = useNavigate();
@@ -11,9 +12,13 @@ export default function TreinamentoDetalhes() {
   // mock simples (depois tu pega pelo ID via params)
   const training = trainingsMock.find((t) => t.id === Number(id));
   const analytics = getTrainingAnalyticsById(Number(id));
+  const forms = getFormsByTrainingId(Number(id));
 
   if (!training) return <div>Nenhum treinamento com esse id</div>;
   if (!analytics) return <div>Nenhuma analise para esse treinamento</div>;
+
+  const preTestForms = forms.filter((form) => form.type === "pre-teste");
+  const postTestForms = forms.filter((form) => form.type === "pos-teste");
 
   return (
     <div className="p-8 bg-neutral-50 min-h-screen">
@@ -47,6 +52,46 @@ export default function TreinamentoDetalhes() {
           principais conceitos e práticas relacionados ao tema, garantindo
           melhor desempenho e alinhamento com os processos da organização.
         </p>
+      </Card>
+
+      <Card className="p-6 mb-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-primary">
+              Gerenciar formularios do treinamento
+            </h2>
+            <p className="mt-1 text-sm text-neutral-600">
+              Crie ou altere os formularios de pre-teste e pos-teste, incluindo
+              prazos, perguntas e minimo de acertos.
+            </p>
+          </div>
+
+          <Button
+            className="bg-primary text-white"
+            onPress={() => navigate(`/painel/gerenciar-treinamentos/${training.id}/formularios`)}
+          >
+            Gerenciar formularios
+          </Button>
+        </div>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-3">
+          <div className="rounded-md bg-blue-50 p-4">
+            <span className="text-sm text-neutral-600">Pre-teste</span>
+            <p className="text-xl font-bold text-blue-700">
+              {preTestForms.length}
+            </p>
+          </div>
+          <div className="rounded-md bg-green-50 p-4">
+            <span className="text-sm text-neutral-600">Pos-teste</span>
+            <p className="text-xl font-bold text-green-700">
+              {postTestForms.length}
+            </p>
+          </div>
+          <div className="rounded-md bg-primary-50 p-4">
+            <span className="text-sm text-neutral-600">Total</span>
+            <p className="text-xl font-bold text-primary">{forms.length}</p>
+          </div>
+        </div>
       </Card>
 
       {/* GRID PRINCIPAL */}
@@ -83,33 +128,93 @@ export default function TreinamentoDetalhes() {
         </Card>
 
         {/* AVALIAÇÕES */}
-        <Card className="p-6">
+        <Card className="p-6 col-span-2">
           <h2 className="text-lg font-semibold text-primary mb-4">
             Avaliações
           </h2>
 
-          <div className="flex flex-col gap-3">
-            {analytics.assessments.map((av) => (
-              <div
-                key={av.titulo}
-                className="bg-neutral-100 border-2 border-gray-300 p-4 rounded-xl"
-              >
-                <p className="font-semibold text-neutral-900">{av.titulo}</p>
-
-                <p className="text-sm text-neutral-700">Tipo: {av.tipo}</p>
-
-                <p className="text-sm text-neutral-700">
-                  Numero de questoes: {av.questoes}
-                </p>
-
-                <p className="text-sm text-neutral-700">Data: {av.data}</p>
-              </div>
-            ))}
+          <div className="grid gap-4 md:grid-cols-2">
+            <FormListGroup
+              title="Pre-teste"
+              forms={preTestForms}
+              onOpen={() => navigate(`/painel/gerenciar-treinamentos/${training.id}/formularios?tipo=pre-teste`)}
+            />
+            <FormListGroup
+              title="Pos-teste"
+              forms={postTestForms}
+              onOpen={() => navigate(`/painel/gerenciar-treinamentos/${training.id}/formularios?tipo=pos-teste`)}
+            />
           </div>
         </Card>
+      </div>
+    </div>
+  );
+}
 
-        {/* (espaço futuro pra outra sessão se quiser) */}
-        <div />
+type FormListGroupProps = {
+  title: string;
+  forms: ReturnType<typeof getFormsByTrainingId>;
+  onOpen: () => void;
+};
+
+function FormListGroup({ title, forms, onOpen }: FormListGroupProps) {
+  return (
+    <div className="rounded-md border border-gray-200 bg-neutral-50 p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="font-semibold text-neutral-900">{title}</h3>
+        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-neutral-600">
+          {forms.length} formulario(s)
+        </span>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        {forms.map((form) => (
+          <button
+            key={form.id}
+            type="button"
+            onClick={onOpen}
+            className="rounded-md bg-white p-4 text-left shadow-sm transition hover:border-primary hover:shadow-md"
+          >
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-primary">
+                  {trainingFormTypeLabel[form.type]}
+                </p>
+                <h4 className="font-semibold text-neutral-900">{form.title}</h4>
+              </div>
+              <span className="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary">
+                {form.questions.length} perguntas
+              </span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 text-sm text-neutral-600">
+              <div>
+                <span>Inicio</span>
+                <p className="font-semibold text-neutral-900">
+                  {form.startDeadline}
+                </p>
+              </div>
+              <div>
+                <span>Termino</span>
+                <p className="font-semibold text-neutral-900">
+                  {form.endDeadline}
+                </p>
+              </div>
+              <div>
+                <span>Minimo</span>
+                <p className="font-semibold text-neutral-900">
+                  {form.minCorrect}%
+                </p>
+              </div>
+            </div>
+          </button>
+        ))}
+
+        {forms.length === 0 && (
+          <div className="rounded-md border border-dashed border-primary-200 bg-primary-50 p-4 text-sm text-neutral-700">
+            Nenhum formulario criado para esta etapa.
+          </div>
+        )}
       </div>
     </div>
   );

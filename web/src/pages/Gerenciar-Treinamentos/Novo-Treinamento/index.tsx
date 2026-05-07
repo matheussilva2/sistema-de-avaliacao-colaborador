@@ -1,32 +1,20 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Button } from "@heroui/react";
 import { useNavigate } from "react-router-dom";
 import { BasicTrainingForm } from "./components/BasicTrainingForm";
-import { TestFormSection } from "./components/TestFormSection";
-import type { Question, TestType, TrainingFormData } from "./types";
+import type { TrainingFormData } from "./types";
 
 export default function CriarTreinamento() {
   const navigate = useNavigate();
   const [trainingImage, setTrainingImage] = useState<File | null>(null);
 
-  // Estado das informações básicas
   const [form, setForm] = useState<TrainingFormData>({
     title: "",
     hours: "",
     startDate: "",
     endDate: "",
-    testType: "pre-teste" as TestType,
-    minCorrect: "70",
     description: "",
   });
-
-  // Estado separado por tipo de avaliação
-  const [testForms, setTestForms] = useState<Record<TestType, Question[]>>({
-    "pre-teste": [],
-    "pos-teste": [],
-  });
-
-  const questions = useMemo(() => testForms[form.testType], [form.testType, testForms]);
 
   const handleChange = (field: keyof TrainingFormData, value: string) => {
     setForm((prev) => ({
@@ -35,125 +23,30 @@ export default function CriarTreinamento() {
     }));
   };
 
-  //FUNÇÕES DO FORMULÁRIO DE PERGUNTAS
-
-  const handleAddQuestion = () => {
-    const newQuestion: Question = {
-      id: Date.now().toString(),
-      title: "",
-      options: [{ id: Date.now().toString() + "-opt", text: "", isCorrect: false }],
-    };
-    setTestForms((prev) => ({
-      ...prev,
-      [form.testType]: [...prev[form.testType], newQuestion],
-    }));
-  };
-
-  const handleQuestionTitleChange = (qId: string, value: string) => {
-    setTestForms((prev) => ({
-      ...prev,
-      [form.testType]: prev[form.testType].map((q) =>
-        q.id === qId ? { ...q, title: value } : q,
-      ),
-    }));
-  };
-
-  const handleRemoveQuestion = (qId: string) => {
-    setTestForms((prev) => ({
-      ...prev,
-      [form.testType]: prev[form.testType].filter((q) => q.id !== qId),
-    }));
-  };
-
-  const handleAddOption = (qId: string) => {
-    setTestForms((prev) => ({
-      ...prev,
-      [form.testType]: prev[form.testType].map((q) => {
-        if (q.id === qId) {
-          return {
-            ...q,
-            options: [...q.options, { id: Date.now().toString(), text: "", isCorrect: false }],
-          };
-        }
-        return q;
-      }),
-    }));
-  };
-
-  const handleOptionChange = (qId: string, optId: string, value: string) => {
-    setTestForms((prev) => ({
-      ...prev,
-      [form.testType]: prev[form.testType].map((q) => {
-        if (q.id === qId) {
-          return {
-            ...q,
-            options: q.options.map((o) =>
-              o.id === optId ? { ...o, text: value } : o,
-            ),
-          };
-        }
-        return q;
-      }),
-    }));
-  };
-
-  const handleToggleCorrectOption = (qId: string, optId: string) => {
-    setTestForms((prev) => ({
-      ...prev,
-      [form.testType]: prev[form.testType].map((q) => {
-        if (q.id === qId) {
-          return {
-            ...q,
-            options: q.options.map((o) =>
-              o.id === optId ? { ...o, isCorrect: !o.isCorrect } : o,
-            ),
-          };
-        }
-        return q;
-      }),
-    }));
-  };
-
-  const handleRemoveOption = (qId: string, optId: string) => {
-    setTestForms((prev) => ({
-      ...prev,
-      [form.testType]: prev[form.testType].map((q) => {
-        if (q.id === qId) {
-          return {
-            ...q,
-            options: q.options.filter((o) => o.id !== optId),
-          };
-        }
-        return q;
-      }),
-    }));
-  };
-
-  //SUBMIT
+  const buildTrainingPayload = () => ({
+    id: Date.now(),
+    title: form.title,
+    hours: Number(form.hours),
+    startDate: form.startDate,
+    endDate: form.endDate,
+    description: form.description,
+    progress: 0,
+    daysLeft: 0,
+    status: "em_andamento",
+    coverImageName: trainingImage?.name ?? null,
+  });
 
   const handleSubmit = () => {
-    // mock de criação
-    const newTraining = {
-      id: Date.now(),
-      title: form.title,
-      hours: Number(form.hours),
-      startDate: form.startDate,
-      endDate: form.endDate,
-      description: form.description,
-      testType: form.testType,
-      minCorrect: Number(form.minCorrect),
-      progress: 0,
-      daysLeft: 0,
-      status: "em_andamento",
-      preTestQuestions: testForms["pre-teste"],
-      posTestQuestions: testForms["pos-teste"],
-      coverImageName: trainingImage?.name ?? null,
-    };
-
-    console.log("NOVO TREINAMENTO:", newTraining);
-
-    // depois tu salva num estado global ou API
+    console.log("NOVO TREINAMENTO:", buildTrainingPayload());
     navigate("/painel/gerenciar-treinamentos");
+  };
+
+  const handleSubmitAndCreateForms = () => {
+    const newTraining = buildTrainingPayload();
+    console.log("NOVO TREINAMENTO:", newTraining);
+    navigate("/painel/gerenciar-treinamentos/novo-treinamento/formularios", {
+      state: { trainingDraft: newTraining },
+    });
   };
 
   return (
@@ -166,20 +59,18 @@ export default function CriarTreinamento() {
           onImageChange={setTrainingImage}
         />
 
-        <TestFormSection
-          testType={form.testType}
-          questions={questions}
-          onAddQuestion={handleAddQuestion}
-          onRemoveQuestion={handleRemoveQuestion}
-          onQuestionTitleChange={handleQuestionTitleChange}
-          onAddOption={handleAddOption}
-          onOptionChange={handleOptionChange}
-          onToggleCorrectOption={handleToggleCorrectOption}
-          onRemoveOption={handleRemoveOption}
-        />
+        <div className="rounded-md border border-primary-100 bg-white p-5 shadow-sm">
+          <h2 className="text-lg font-semibold text-primary">
+            Formularios do treinamento
+          </h2>
+          <p className="mt-1 text-sm text-neutral-600">
+            Voce pode criar os formularios agora ou salvar apenas os dados
+            basicos e configurar pre-teste e pos-teste depois no card do
+            treinamento.
+          </p>
+        </div>
 
-        {/* BOTÕES DE AÇÃO GERAIS */}
-        <div className="flex gap-3 mt-4 justify-end">
+        <div className="flex flex-wrap gap-3 mt-4 justify-end">
           <Button
             className="bg-neutral-300 text-neutral-800 w-32"
             onPress={() => navigate(-1)}
@@ -188,13 +79,19 @@ export default function CriarTreinamento() {
           </Button>
 
           <Button
-            className="bg-primary text-white w-48"
+            className="bg-white text-primary border border-primary px-6"
+            onPress={handleSubmitAndCreateForms}
+          >
+            Salvar e criar formularios
+          </Button>
+
+          <Button
+            className="bg-primary text-white px-6"
             onPress={handleSubmit}
           >
             Salvar Treinamento
           </Button>
         </div>
-
       </div>
     </div>
   );
