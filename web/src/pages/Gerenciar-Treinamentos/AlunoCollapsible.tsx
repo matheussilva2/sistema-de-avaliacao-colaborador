@@ -1,20 +1,10 @@
 import { useState } from "react";
 import { Button } from "@heroui/react";
-
-export type AlunoProgress = {
-  nome: string;
-  status: string;
-  foto?: string;
-  progress: number;
-  notaMedia: string;
-  ultimaAtividade: string;
-  tarefasConcluidas: number;
-  totalTarefas: number;
-  comentarios: string;
-};
+import type { StudentTrainingAnalytics } from "./mocks/trainingAnalytics";
+import StudentQuizComparison from "./Treinamento-Detalhe/components/StudentQuizComparison";
 
 type Props = {
-  aluno: AlunoProgress;
+  aluno: StudentTrainingAnalytics;
 };
 
 export default function AlunoCollapsible({ aluno }: Props) {
@@ -80,7 +70,9 @@ export default function AlunoCollapsible({ aluno }: Props) {
             </div>
             <div className="rounded-2xl bg-white p-4 shadow-sm">
               <p className="text-sm text-neutral-500">Nota média</p>
-              <p className="mt-2 text-lg font-semibold text-neutral-900">{aluno.notaMedia}</p>
+              <p className="mt-2 text-lg font-semibold text-neutral-900">
+                {aluno.notaMedia.toFixed(1)}
+              </p>
             </div>
             <div className="rounded-2xl bg-white p-4 shadow-sm">
               <p className="text-sm text-neutral-500">Última atividade</p>
@@ -106,6 +98,10 @@ export default function AlunoCollapsible({ aluno }: Props) {
                 rows={4}
               />
             </div>
+          </div>
+
+          <div className="mt-4">
+            <StudentQuizComparison aluno={aluno} />
           </div>
         </div>
       )}
