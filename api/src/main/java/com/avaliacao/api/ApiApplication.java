@@ -14,5 +14,5 @@ public class ApiApplication {
 
 /*
 * API REST
-*  SEGUINDO O MODELO DE MATURIDADE DE leonard richardson
+*  SEGUINDO O MODELO DE MATURIDADE DE leonard richardson até o nível 2
  */
