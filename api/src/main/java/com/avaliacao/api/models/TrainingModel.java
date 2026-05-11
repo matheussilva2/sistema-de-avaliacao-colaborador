@@ -4,6 +4,8 @@ package com.avaliacao.api.models;
 import jakarta.persistence.*;
 
 import java.io.Serializable;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -14,19 +16,27 @@ public class TrainingModel implements Serializable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
-    private UUID idProduct; // o id é gerado sozinho
+    private UUID idTraining; // o id é gerado sozinho
     private String title;
     private String initDate;
     private String endDate;
     private int workload;
     private String description;
 
-    public UUID getIdProduct() {
-        return idProduct;
+    @ManyToMany
+    @JoinTable(
+            name = "TB_TRAINING_USERS",
+            joinColumns = @JoinColumn(name = "training_id"),
+            inverseJoinColumns = @JoinColumn(name = "user_id")
+    )
+    private Set<UserModel> users = new HashSet<>();
+
+    public UUID getIdTraining() {
+        return idTraining;
     }
 
-    public void setIdProduct(UUID idProduct) {
-        this.idProduct = idProduct;
+    public void setIdTraining(UUID idTraining) {
+        this.idTraining = idTraining;
     }
 
     public String getTitle() {
@@ -67,5 +77,13 @@ public class TrainingModel implements Serializable {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public Set<UserModel> getUsers() {
+        return users;
+    }
+
+    public void setUsers(Set<UserModel> users) {
+        this.users = users;
     }
 }

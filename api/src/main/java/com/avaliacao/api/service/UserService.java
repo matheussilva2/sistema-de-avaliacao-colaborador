@@ -1,15 +1,17 @@
 package com.avaliacao.api.service;
 
-import com.avaliacao.api.dtos.TrainingRecordDTO;
 import com.avaliacao.api.dtos.UserRecordDTO;
+import com.avaliacao.api.models.TrainingModel;
 import com.avaliacao.api.models.UserModel;
 import com.avaliacao.api.repositories.UserRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.beans.BeanUtils;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -69,5 +71,16 @@ public class UserService {
         userRepository.delete(userO.get());
         return true;
 
+    }
+
+    @Transactional
+    public Optional<Set<TrainingModel>> findTrainingsByUser(UUID id){
+        var userO = userRepository.findById(id);
+
+        if(userO.isEmpty()){
+            return Optional.empty();
+        }
+
+        return Optional.of(userO.get().getTrainings());
     }
 }

@@ -1,8 +1,12 @@
 package com.avaliacao.api.models;
 
 import com.avaliacao.api.enums.UserRole;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -17,6 +21,8 @@ public class UserModel {
     private String name;
     private String lastName;
     private String email;
+
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String passWord;
     private String phone;
     private String cpf;
@@ -25,6 +31,10 @@ public class UserModel {
     private UserRole userRole;
 
     private boolean active;
+
+    @JsonIgnore
+    @ManyToMany(mappedBy = "users")
+    private Set<TrainingModel> trainings = new HashSet<>();
 
     public UUID getId() {
         return id;
@@ -96,5 +106,13 @@ public class UserModel {
 
     public void setPassWord(String passWord) {
         this.passWord = passWord;
+    }
+
+    public Set<TrainingModel> getTrainings() {
+        return trainings;
+    }
+
+    public void setTrainings(Set<TrainingModel> trainings) {
+        this.trainings = trainings;
     }
 }

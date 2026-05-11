@@ -1,6 +1,7 @@
 package com.avaliacao.api.controller;
 
 import com.avaliacao.api.dtos.UserRecordDTO;
+import com.avaliacao.api.models.TrainingModel;
 import com.avaliacao.api.models.UserModel;
 import com.avaliacao.api.service.UserService;
 import jakarta.validation.Valid;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
@@ -85,5 +87,19 @@ public class UserController {
                 .body("User deleted successfully");
     }
 
+    @GetMapping("/{id}/trainings")
+    public ResponseEntity<Object> getUserTrainings(@PathVariable(value = "id") UUID id){
+        Optional<Set<TrainingModel>> trainingsO = userService.findTrainingsByUser(id);
+
+        if(trainingsO.isEmpty()){
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body("User not found.");
+        }
+
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(trainingsO.get());
+    }
 
 }

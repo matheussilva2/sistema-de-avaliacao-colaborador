@@ -2,6 +2,7 @@ package com.avaliacao.api.controller;
 
 import com.avaliacao.api.dtos.TrainingRecordDTO;
 import com.avaliacao.api.models.TrainingModel;
+import com.avaliacao.api.models.UserModel;
 import com.avaliacao.api.service.TrainingService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 // chore metodos http completos para trainig
@@ -103,5 +105,58 @@ public class TrainingController {
         return ResponseEntity
                 .status(HttpStatus.OK)
                 .body("Training deleted successfully");
+    }
+
+    @PostMapping("/{trainingId}/users/{userId}")
+    public ResponseEntity<Object> addUserToTraining(
+            @PathVariable(value = "trainingId") UUID trainingId,
+            @PathVariable(value = "userId") UUID userId){
+
+        Optional<TrainingModel> trainingO = trainingService.addUser(trainingId,userId);
+
+        if(trainingO.isEmpty()){
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body("Training or user not found.");
+        }
+
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(trainingO.get());
+    }
+
+    @DeleteMapping("/{trainingId}/users/{userId}")
+    public ResponseEntity<Object> removeUserFromTraining(
+            @PathVariable(value = "trainingId") UUID trainingId,
+            @PathVariable(value = "userId") UUID userId){
+
+        Optional<TrainingModel> trainingO = trainingService.removeUser(trainingId,userId);
+
+        if(trainingO.isEmpty()){
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body("Training or user not found.");
+        }
+
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(trainingO.get());
+    }
+
+    @GetMapping("/{trainingId}/users")
+    public ResponseEntity<Object> getTrainingUsers(
+            @PathVariable(value = "trainingId") UUID trainingId){
+
+        Optional<Set<UserModel>> usersO = trainingService.findUsersByTraining(trainingId);
+
+        if(usersO.isEmpty()){
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body("Training not found.");
+        }
+
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(usersO.get());
     }
 }
