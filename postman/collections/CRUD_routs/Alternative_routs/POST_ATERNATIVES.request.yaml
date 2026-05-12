@@ -1,0 +1,32 @@
+$kind: http-request
+name: POST_ATERNATIVES
+description: |-
+  Description: Cria uma altenativa vinculada a uma questão
+
+  URL_FORMAT: [http://localhost:8080](http://localhost:8080/questions)/questions/{QUESTION_ID}/alternatives
+
+  JSON:
+
+  {
+
+  "text": "STRING TEXTT"
+
+  "correct":{true,false}
+
+  }
+url: "
+  http://localhost:8080/questions/ef10486b-a259-41bd-8351-6ef42d46b90d/alternat\
+  ives"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \  \"text\": \"RANDON ALTERNATIVE\",\r
+
+    \  \"correct\":true\r
+
+    \  \r
+
+    }"
+order: 1778599934513

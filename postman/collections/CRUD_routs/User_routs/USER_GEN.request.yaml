@@ -1,0 +1,25 @@
+$kind: http-request
+url: http://localhost:8080/users
+method: GET
+body:
+  type: json
+  content: "{\r
+
+    \    \"name\": \"Pedro\",\r
+
+    \    \"lastName\": \"Cabral Gomes1\",\r
+
+    \    \"email\": \"pedro@email.com\",\r
+
+    \    \"passWord\": \"Pedro@123\",\r
+
+    \    \"phone\": \"82999839943\",\r
+
+    \    \"cpf\": \"071.297.885-96\",\r
+
+    \    \"userRole\": \"MANAGER\",\r
+
+    \    \"active\": true\r
+
+    }"
+order: 1778596763727

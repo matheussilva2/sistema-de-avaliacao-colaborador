@@ -1,0 +1,24 @@
+$kind: http-request
+name: PUT_QUESTION
+description: |-
+  Description: Modifica as informações de uma questão
+
+  URL_FORMAT:http://localhost:8080/questions/{QUESTION_ID}
+
+  JSON:
+
+  {
+
+  "title" : "STRING CONTENT"
+
+  }
+url: http://localhost:8080/questions/6155ebbf-d3ae-4111-8e34-d2a2217a31f5
+method: PUT
+body:
+  type: json
+  content: "{\r
+
+    \    \"title\" : \"HOLY MOLY\"\r
+
+    }"
+order: 4495804973634951

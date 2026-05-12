@@ -1,0 +1,11 @@
+$kind: http-request
+name: GET_SINGLE_QUESTION
+description: |-
+  Description: Retorna uma questão específica
+
+  URL_Format: http://localhost:8080/questions/{QUESTION_ID}
+
+  JSON: não contém
+url: http://localhost:8080/questions/6155ebbf-d3ae-4111-8e34-d2a2217a31f5
+method: GET
+order: 4471327460597337

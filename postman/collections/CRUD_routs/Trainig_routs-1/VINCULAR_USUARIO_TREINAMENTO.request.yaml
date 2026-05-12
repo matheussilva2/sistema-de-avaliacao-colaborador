@@ -1,0 +1,5 @@
+$kind: http-request
+name: VINCULAR_USUARIO_TREINAMENTO
+url: http://localhost:8080/trainings/0edb9a98-7b5c-4541-8b51-1985946487da/users/2d520e10-d205-4a5c-ad82-9b01ee8a4239
+method: POST
+order: 4497054891300129

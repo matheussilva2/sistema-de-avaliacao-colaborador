@@ -1,0 +1,5 @@
+$kind: http-request
+name: TRAINIG_GET_ONE
+url: http://localhost:8080/trainings/93d7c4ca-b94d-4289-85d3-f85a7cab980c
+method: GET
+order: 4314582183011318

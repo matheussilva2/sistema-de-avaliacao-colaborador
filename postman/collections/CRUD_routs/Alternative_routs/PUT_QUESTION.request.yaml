@@ -1,0 +1,30 @@
+$kind: http-request
+name: PUT_QUESTION
+description: |-
+  Description: Modifica uma questão pelo ID
+
+  URL_FORMAT: [http://localhost:8080](http://localhost:8080/questions)/alternatives/{ALTERNATIVE_ID}
+
+  JSON:
+
+  {
+
+  "text": "STRING TEXTT"
+
+  "correct":{true,false}
+
+  }
+url: http://localhost:8080/alternatives/04593559-c455-4bba-af87-749c5723513b
+method: PUT
+body:
+  type: json
+  content: "{\r
+
+    \  \"text\": \"RANDON ALTERNATIVE\",\r
+
+    \  \"correct\":false\r
+
+    \  \r
+
+    }"
+order: 4379210716890763

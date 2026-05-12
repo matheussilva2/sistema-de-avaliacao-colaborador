@@ -1,0 +1,23 @@
+$kind: http-request
+name: TRAINING_POST
+url: http://localhost:8080/trainings
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \"title\": \"SPRINGBOOT em JAVA \",\r
+
+    \"initDate\": \"2026-05-20\",\r
+
+    \"endDate\": \"2026-06-30\",\r
+
+    \"workload\": 1144444444,\r
+
+    \"description\": \"Treinamento de SrpingBoot em Java
+    !!!!!!!!!!!!!!!!!!!.\"\r
+
+    \r
+
+    }"
+order: 2738570103356426
