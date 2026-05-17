@@ -26,6 +26,12 @@ public class UserService {
     }
 
     public UserModel create(UserRecordDTO userRecordDTO){
+        var userWithSameEmail = userRepository.findByEmail(userRecordDTO.email());
+
+        if(userWithSameEmail.isPresent()){
+            throw new IllegalArgumentException("Email already registered.");
+        }
+
         var user = new UserModel();
 
         String encryptedPassword = passwordEncoder.encode(userRecordDTO.passWord());
@@ -72,6 +78,12 @@ public class UserService {
         }
 
         var user = userO.get();
+
+        var userWithSameEmail = userRepository.findByEmail(userRecordDTO.email());
+
+        if(userWithSameEmail.isPresent() && !userWithSameEmail.get().getId().equals(id)){
+            throw new IllegalArgumentException("Email already registered.");
+        }
 
         String encryptedPassword = passwordEncoder.encode(userRecordDTO.passWord());
 

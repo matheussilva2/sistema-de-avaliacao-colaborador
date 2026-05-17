@@ -20,6 +20,7 @@ public class UserModel {
 
     private String name;
     private String lastName;
+    @Column(unique = true)
     private String email;
 
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)

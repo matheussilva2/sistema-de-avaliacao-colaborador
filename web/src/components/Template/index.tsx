@@ -1,7 +1,13 @@
+import { useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { MenuItem } from "./components/MenuItem";
 import { ArrowLeft, LogOut } from "lucide-react";
 import { userMock } from "../../mock";
+import {
+  clearAuthenticatedUser,
+  getAuthenticatedUser,
+  syncUserMockWithApiUser,
+} from "../../services/authService";
 
 
 function getTitle(pathname: string) {
@@ -29,6 +35,14 @@ export default function Tamplate() {
   const { pathname } = useLocation();
 
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const authenticatedUser = getAuthenticatedUser();
+
+    if (authenticatedUser) {
+      syncUserMockWithApiUser(authenticatedUser);
+    }
+  }, []);
 
   const menuItemsColaborador = [
     {
@@ -78,6 +92,10 @@ export default function Tamplate() {
     (item) => item.link === pathname,
   );
 
+  const handleLogout = () => {
+    clearAuthenticatedUser();
+  };
+
   return (
     <div className="flex">
       <aside className="w-75 h-screen bg-white border-r border-zinc-300">
@@ -91,7 +109,12 @@ export default function Tamplate() {
         </div>
         <nav className="flex flex-col gap-1 pt-5">
           {menuItems.map((item) => (
-            <MenuItem link={item.link} isActive={pathname === item.link}>
+            <MenuItem
+              key={item.link}
+              link={item.link}
+              isActive={pathname === item.link}
+              onClick={item.label === "Sair" ? handleLogout : undefined}
+            >
               {item.label === "Sair" ? (
                 <span className="flex gap-3 items-center">
                   {item.label}

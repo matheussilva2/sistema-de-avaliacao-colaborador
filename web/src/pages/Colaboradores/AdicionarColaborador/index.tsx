@@ -1,23 +1,28 @@
-import { type ChangeEvent, useState } from "react";
+import { type ChangeEvent, type FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, Input, Label, Button } from "@heroui/react";
 import { UserCircle2 } from "lucide-react";
+import { ApiRequestError, type ApiUserRole } from "../../../services/authService";
+import { createUser } from "../../../services/userService";
 
 export default function AdicionarColaborador() {
   const navigate = useNavigate();
   const [previewUrl, setPreviewUrl] = useState("");
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [form, setForm] = useState({
     nome: "",
     sobrenome: "",
     cpf: "",
     email: "",
     telefone: "",
-    cargo: "colaborador",
+    senha: "",
+    userRole: "EMPLOYEE" as ApiUserRole,
     situacao: "Ativo",
     dataContratacao: "",
     dataRegistro: "",
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
   const handleFieldChange = (field: keyof typeof form, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
@@ -25,25 +30,40 @@ export default function AdicionarColaborador() {
   const handlePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
     if (!file) {
-      setPhotoFile(null);
       setPreviewUrl("");
       return;
     }
 
-    setPhotoFile(file);
     setPreviewUrl(URL.createObjectURL(file));
   };
 
-  const handleSave = () => {
-    const payload = {
-      ...form,
-      situacao: form.situacao,
-      foto: photoFile,
-      dataRegistro: form.dataRegistro || new Date().toLocaleDateString("pt-BR"),
-    };
+  const handleSave = async (event: FormEvent) => {
+    event.preventDefault();
+    setErrorMessage("");
+    setIsLoading(true);
 
-    console.log("Salvar novo colaborador:", payload);
-    navigate("/painel/colaboradores");
+    try {
+      await createUser({
+        name: form.nome,
+        lastName: form.sobrenome,
+        cpf: form.cpf,
+        email: form.email,
+        phone: form.telefone,
+        passWord: form.senha,
+        userRole: form.userRole,
+        active: form.situacao === "Ativo",
+      });
+
+      navigate("/painel/colaboradores");
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.status === 409) {
+        setErrorMessage("Ja existe uma conta cadastrada com esse e-mail.");
+      } else {
+        setErrorMessage("Nao foi possivel cadastrar o usuario. Confira os dados.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -96,7 +116,7 @@ export default function AdicionarColaborador() {
           </Card>
         </div>
 
-        <div className="col-span-12 xl:col-span-8 space-y-6">
+        <form onSubmit={handleSave} className="col-span-12 xl:col-span-8 space-y-6">
           <Card className="rounded-3xl bg-white shadow-sm overflow-hidden">
             <div className="bg-primary text-white px-6 py-4">
               <h2 className="font-semibold">Dados pessoais</h2>
@@ -113,6 +133,7 @@ export default function AdicionarColaborador() {
                   onChange={(e) => handleFieldChange("nome", e.target.value)}
                   placeholder="Digite o nome"
                   className="bg-white"
+                  required
                 />
               </div>
               <div className="flex flex-col gap-2">
@@ -126,6 +147,7 @@ export default function AdicionarColaborador() {
                   onChange={(e) => handleFieldChange("sobrenome", e.target.value)}
                   placeholder="Digite o sobrenome"
                   className="bg-white"
+                  required
                 />
               </div>
               <div className="flex flex-col gap-2">
@@ -139,6 +161,7 @@ export default function AdicionarColaborador() {
                   onChange={(e) => handleFieldChange("cpf", e.target.value)}
                   placeholder="000.000.000-00"
                   className="bg-white"
+                  required
                 />
               </div>
               <div className="flex flex-col gap-2">
@@ -152,6 +175,7 @@ export default function AdicionarColaborador() {
                   onChange={(e) => handleFieldChange("email", e.target.value)}
                   placeholder="email@empresa.com"
                   className="bg-white"
+                  required
                 />
               </div>
               <div className="flex flex-col gap-2">
@@ -165,24 +189,40 @@ export default function AdicionarColaborador() {
                   onChange={(e) => handleFieldChange("telefone", e.target.value)}
                   placeholder="(XX) XXXXX-XXXX"
                   className="bg-white"
+                  required
                 />
               </div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="cargo" className="text-primary-700 font-semibold text-sm">
-                  Cargo
+                <Label htmlFor="senha" className="text-primary-700 font-semibold text-sm">
+                  Senha inicial
                 </Label>
                 <Input
-                  id="cargo"
-                  type="text"
-                  value={form.cargo}
-                  onChange={(e) => handleFieldChange("cargo", e.target.value)}
-                  placeholder="Ex: colaborador"
+                  id="senha"
+                  type="password"
+                  value={form.senha}
+                  onChange={(e) => handleFieldChange("senha", e.target.value)}
+                  placeholder="Senha para primeiro acesso"
                   className="bg-white"
+                  required
                 />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="userRole" className="text-primary-700 font-semibold text-sm">
+                  Tipo de usuario
+                </Label>
+                <select
+                  id="userRole"
+                  value={form.userRole}
+                  onChange={(e) => handleFieldChange("userRole", e.target.value)}
+                  className="bg-white border rounded-xl h-10 px-3"
+                >
+                  <option value="EMPLOYEE">Colaborador</option>
+                  <option value="MANAGER">Gestor</option>
+                </select>
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="situacao" className="text-primary-700 font-semibold text-sm">
-                  Situação
+                  Situacao
                 </Label>
                 <select
                   id="situacao"
@@ -221,12 +261,22 @@ export default function AdicionarColaborador() {
             </div>
           </Card>
 
+          {errorMessage && (
+            <p className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
+              {errorMessage}
+            </p>
+          )}
+
           <div className="flex justify-end">
-            <Button className="bg-primary text-white px-8" onPress={handleSave}>
-              Salvar
+            <Button
+              type="submit"
+              className="bg-primary text-white px-8"
+              isDisabled={isLoading}
+            >
+              {isLoading ? "Salvando..." : "Salvar"}
             </Button>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );

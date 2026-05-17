@@ -26,12 +26,18 @@ public class UserController {
 
 
     @PostMapping
-    public ResponseEntity<UserModel> CreateUser(
+    public ResponseEntity<Object> CreateUser(
             @RequestBody @Valid UserRecordDTO userRecordDTO){
 
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(userService.create(userRecordDTO));
+        try {
+            return ResponseEntity
+                    .status(HttpStatus.CREATED)
+                    .body(userService.create(userRecordDTO));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity
+                    .status(HttpStatus.CONFLICT)
+                    .body(exception.getMessage());
+        }
     }
 
     @GetMapping
@@ -61,8 +67,15 @@ public class UserController {
     public ResponseEntity<Object> updateUser(@PathVariable(value = "id") UUID id,
                                              @RequestBody @Valid UserRecordDTO userRecordDTO){
 
-        Optional<UserModel> userO = userService
-                .update(id,userRecordDTO);
+        Optional<UserModel> userO;
+
+        try {
+            userO = userService.update(id,userRecordDTO);
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity
+                    .status(HttpStatus.CONFLICT)
+                    .body(exception.getMessage());
+        }
 
         if(userO.isEmpty()){
             return ResponseEntity

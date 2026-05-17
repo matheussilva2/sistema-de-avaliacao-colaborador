@@ -1,8 +1,12 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Input, Card } from "@heroui/react";
-import { userMock } from "../../mock";
 import type { Cargo } from "../../types/User";
+import {
+  login,
+  mapUserRoleToCargo,
+  saveAuthenticatedUser,
+} from "../../services/authService";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -11,21 +15,37 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const handleLogin = (e: FormEvent) => {
+  const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setErrorMessage("");
 
-    setTimeout(() => {
-      if (role === "colaborador") {
+    try {
+      const authenticatedUser = await login({
+        email,
+        passWord: password,
+      });
+
+      saveAuthenticatedUser(authenticatedUser);
+
+      const authenticatedRole = mapUserRoleToCargo(authenticatedUser.userRole);
+
+      if (authenticatedRole === "colaborador") {
         navigate("/painel");
       } else {
         navigate("/painel/meu-perfil");
       }
-
-      userMock.cargo = role;
+    } catch (error) {
+      if (error instanceof TypeError) {
+        setErrorMessage("Nao foi possivel conectar com a API. Verifique se o Spring esta rodando na porta 8080.");
+      } else {
+        setErrorMessage("E-mail ou senha invalidos.");
+      }
+    } finally {
       setIsLoading(false);
-    }, 500);
+    }
   };
 
   return (
@@ -88,6 +108,12 @@ export default function Login() {
               className="bg-neutral-50"
               required
             />
+
+            {errorMessage && (
+              <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                {errorMessage}
+              </p>
+            )}
 
             <Button
               type="submit"

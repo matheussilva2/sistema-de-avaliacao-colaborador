@@ -1,0 +1,49 @@
+import {
+  request,
+  type ApiUser,
+  type ApiUserRole,
+  type CreateUserPayload,
+} from "./authService";
+
+export type UserFormPayload = {
+  name: string;
+  lastName: string;
+  email: string;
+  passWord: string;
+  phone: string;
+  cpf: string;
+  userRole: ApiUserRole;
+  active: boolean;
+};
+
+export function getUsers() {
+  return request<ApiUser[]>("/users", {
+    method: "GET",
+  });
+}
+
+export function getUserById(id: string) {
+  return request<ApiUser>(`/users/${id}`, {
+    method: "GET",
+  });
+}
+
+export function createUser(payload: CreateUserPayload) {
+  return request<ApiUser>("/users", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateUser(id: string, payload: UserFormPayload) {
+  return request<ApiUser>(`/users/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteUser(id: string) {
+  return request<string>(`/users/${id}`, {
+    method: "DELETE",
+  });
+}
