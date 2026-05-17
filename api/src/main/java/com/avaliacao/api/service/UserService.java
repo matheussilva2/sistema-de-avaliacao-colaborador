@@ -1,5 +1,6 @@
 package com.avaliacao.api.service;
 
+import com.avaliacao.api.dtos.LoginRecordDTO;
 import com.avaliacao.api.dtos.UserRecordDTO;
 import com.avaliacao.api.models.TrainingModel;
 import com.avaliacao.api.models.UserModel;
@@ -41,6 +42,26 @@ public class UserService {
 
     public Optional<UserModel> findById(UUID id){
         return userRepository.findById(id);
+    }
+
+    public Optional<UserModel> login(LoginRecordDTO loginRecordDTO){
+        var userO = userRepository.findByEmail(loginRecordDTO.email());
+
+        if(userO.isEmpty()){
+            return Optional.empty();
+        }
+
+        var user = userO.get();
+        boolean passwordMatches = passwordEncoder.matches(
+                loginRecordDTO.passWord(),
+                user.getPassWord()
+        );
+
+        if(!passwordMatches){
+            return Optional.empty();
+        }
+
+        return Optional.of(user);
     }
 
     public Optional<UserModel> update(UUID id, UserRecordDTO userRecordDTO){
