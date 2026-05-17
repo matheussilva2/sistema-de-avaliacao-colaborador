@@ -1,0 +1,27 @@
+$kind: http-request
+url: http://localhost:8080/users/70c6a636-384b-497b-a921-8419f70a8d36
+method: DELETE
+body:
+  type: json
+  content: "{\r
+
+    \    \"name\": \"Pedro\",\r
+
+    \    \"lastName\": \"Cabral Gome José\",\r
+
+    \    \"email\": \"pedro@email.com\",\r
+
+    \    \"passWord\": \"AAAAAAAAAAAAAAAAAAAA\",\r
+
+    \    \"phone\": \"82999839943\",\r
+
+    \    \"cpf\": \"071.297.885-96\",\r
+
+    \    \"userRole\": \"MANAGER\",\r
+
+    \    \"active\": true\r
+
+    \    \r
+
+    }"
+order: 3801446458007500

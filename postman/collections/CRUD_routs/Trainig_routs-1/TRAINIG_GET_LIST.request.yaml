@@ -1,0 +1,4 @@
+$kind: http-request
+url: http://localhost:8080/trainings
+method: GET
+order: 1778597036416

@@ -1,0 +1,11 @@
+$kind: http-request
+name: DELET_QUESTION
+description: |-
+  Description: Exclui uma alternativa da base de dados usando o ID
+
+  URL_FORMAT: [http://localhost:8080](http://localhost:8080/questions)/alternatives/{ALTERNATIVE_ID}
+
+  JSON: Não contém
+url: http://localhost:8080/alternatives/2f031671-5304-4a58-8600-e4d19435fdc7
+method: DELETE
+order: 4497847248842602

@@ -1,0 +1,5 @@
+$kind: http-request
+name: TRAINIG_DELET_ONE
+url: http://localhost:8080/trainings/e60779d2-89f9-4c62-b4c2-924720e39b5
+method: DELETE
+order: 4491812535811440

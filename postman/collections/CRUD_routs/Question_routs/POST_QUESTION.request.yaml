@@ -1,0 +1,24 @@
+$kind: http-request
+name: POST_QUESTION
+description: |-
+  Description: Requisição para criar questão em um formulário
+
+  URL_FORMAT: [http://localhost:8080/forms/{FORMS_ID}/questions](http://localhost:8080/forms/{FORMS_ID}/questions)
+
+  JSON_FORMAT:
+
+  {
+
+  "title" : "STRING CONTENT"
+
+  }
+url: http://localhost:8080/forms/51cf3c7c-9ba0-49ed-b603-d2a241222911/questions
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \    \"title\" : \"SEGUNDA QUESTÃO PARA FINS DE TESTE\"\r
+
+    }"
+order: 1778598228383

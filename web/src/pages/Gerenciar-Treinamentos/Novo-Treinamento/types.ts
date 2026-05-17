@@ -17,7 +17,5 @@ export type TrainingFormData = {
   hours: string;
   startDate: string;
   endDate: string;
-  testType: TestType;
-  minCorrect: string;
   description: string;
 };

@@ -1,0 +1,11 @@
+$kind: http-request
+name: DELET_QUESTION
+description: |-
+  Description: Deleta uma questão
+
+  URL_FORMAT: URL_FORMAT:http://localhost:8080/questions/{QUESTION_ID}
+
+  JSON: não contém
+url: http://localhost:8080/questions/ef15097a-5655-48e8-a04d-59a99adbbaec
+method: DELETE
+order: 4497727210325477

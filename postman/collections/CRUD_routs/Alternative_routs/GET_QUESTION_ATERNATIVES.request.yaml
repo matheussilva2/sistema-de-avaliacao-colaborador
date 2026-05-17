@@ -1,0 +1,11 @@
+$kind: http-request
+name: GET_QUESTION_ATERNATIVES
+description: |-
+  Descrition: Retorna as aleternativas de cada questão pelo ID da questão
+
+  URL_FORMAT: [http://localhost:8080](http://localhost:8080/questions)/questions/{questionId}/alternatives
+
+  JSON: não contém
+url: http://localhost:8080/questions/ef10486b-a259-41bd-8351-6ef42d46b90d/alternatives
+method: GET
+order: 4290427230343872

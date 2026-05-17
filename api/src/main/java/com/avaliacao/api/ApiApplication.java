@@ -1,0 +1,18 @@
+package com.avaliacao.api;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class ApiApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(ApiApplication.class, args);
+	}
+
+}
+
+/*
+* API REST
+* SEGUINDO O MODELO DE MATURIDADE DE leonard richardson até o nível 2
+*/

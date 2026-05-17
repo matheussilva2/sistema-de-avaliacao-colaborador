@@ -1,0 +1,11 @@
+$kind: http-request
+name: GET_ALL_ALTERNATIVES
+description: |-
+  Description: Lista todas as alternativas do banco de dados
+
+  URL_FORMAT: [http://localhost:8080](http://localhost:8080/questions)/alternatives
+
+  JSON: não contém
+url: " http://localhost:8080/alternatives"
+method: GET
+order: 4030108097660744

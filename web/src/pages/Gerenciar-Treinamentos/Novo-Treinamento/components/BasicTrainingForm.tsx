@@ -1,5 +1,5 @@
 import { Input, Card } from "@heroui/react";
-import type { TrainingFormData, TestType } from "../types";
+import type { TrainingFormData } from "../types";
 
 type BasicTrainingFormProps = {
   form: TrainingFormData;
@@ -7,11 +7,6 @@ type BasicTrainingFormProps = {
   selectedImageName?: string;
   onImageChange: (file: File | null) => void;
 };
-
-const testTypeOptions: { value: TestType; label: string }[] = [
-  { value: "pre-teste", label: "Pré-teste" },
-  { value: "pos-teste", label: "Pós-teste" },
-];
 
 export function BasicTrainingForm({
   form,
@@ -78,53 +73,12 @@ export function BasicTrainingForm({
           />
         </div>
 
-        <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-neutral-700" htmlFor="minCorrect">
-            Mínimo de acertos para ser aprovado
-          </label>
-          <select
-            id="minCorrect"
-            value={form.minCorrect}
-            onChange={(e) => onChange("minCorrect", e.target.value)}
-            className="bg-white border-2 border-neutral-300 rounded-md p-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-          >
-            <option value="50">50% de acertos</option>
-            <option value="60">60% de acertos</option>
-            <option value="70">70% de acertos</option>
-            <option value="80">80% de acertos</option>
-            <option value="90">90% de acertos</option>
-          </select>
-        </div>
-
         <textarea
           placeholder="Descrição do treinamento..."
           value={form.description}
           onChange={(e) => onChange("description", e.target.value)}
           className="bg-white border-2 border-neutral-300 rounded-md p-3 text-sm outline-none resize-none min-h-[120px] focus:border-primary focus:ring-2 focus:ring-primary/20"
         />
-
-        <div className="flex flex-col gap-3">
-          <span className="text-sm font-medium text-neutral-700">Tipo de avaliação</span>
-          <div className="inline-flex items-center rounded-2xl bg-slate-200 p-1 shadow-sm">
-            {testTypeOptions.map((option) => {
-              const isActive = form.testType === option.value;
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => onChange("testType", option.value)}
-                  className={`min-w-[120px] rounded-2xl px-4 py-2 text-sm font-semibold transition-all ${
-                    isActive
-                      ? "bg-primary text-white shadow"
-                      : "bg-white text-primary text-opacity-90 hover:bg-primary-50"
-                  }`}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
       </div>
     </Card>
   );

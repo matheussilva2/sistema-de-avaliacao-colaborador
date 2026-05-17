@@ -1,0 +1,5 @@
+$kind: http-request
+name: LISTAR_TREINAMENTO_USUÁRIOS
+url: http://localhost:8080/users/2d520e10-d205-4a5c-ad82-9b01ee8a4239/trainings
+method: GET
+order: 3832818333049365

@@ -1,0 +1,11 @@
+$kind: http-request
+name: GET_SINGLE_ALTERNATIVE
+description: |-
+  Description: Retorna a altenativa referente ao ID
+
+  URL_FORMAT: [http://localhost:8080](http://localhost:8080/questions)/alternatives/{ALTERNATIVE_ID}
+
+  JSON: não contém
+url: " http://localhost:8080/alternatives/04593559-c455-4bba-af87-749c5723513b"
+method: GET
+order: 4180154230758378

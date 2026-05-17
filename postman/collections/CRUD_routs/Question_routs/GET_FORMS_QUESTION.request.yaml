@@ -1,0 +1,11 @@
+$kind: http-request
+name: GET_FORMS_QUESTION
+description: |-
+  Description: retona a lista de Questões de um formulário específico
+
+  URL_FORMAT: http://localhost:8080/forms/{FORM_ID}/questions
+
+  JSON: não contém
+url: http://localhost:8080/forms/51cf3c7c-9ba0-49ed-b603-d2a241222911/questions
+method: GET
+order: 4482473693355547

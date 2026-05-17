@@ -1,0 +1,11 @@
+$kind: http-request
+name: GET_ALL_QUESTIONS
+description: |-
+  Description: Retorna uma lista com todas as questões
+
+  URL: http://localhost:8080/questions
+
+  JSON: não contém
+url: http://localhost:8080/questions
+method: GET
+order: 4452639717466035
