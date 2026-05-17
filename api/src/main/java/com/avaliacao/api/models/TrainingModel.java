@@ -23,6 +23,10 @@ public class TrainingModel implements Serializable {
     private int workload;
     private String description;
 
+    @ManyToOne
+    @JoinColumn(name = "manager_id")
+    private UserModel manager;
+
     @ManyToMany
     @JoinTable(
             name = "TB_TRAINING_USERS",
@@ -85,5 +89,13 @@ public class TrainingModel implements Serializable {
 
     public void setUsers(Set<UserModel> users) {
         this.users = users;
+    }
+
+    public UserModel getManager() {
+        return manager;
+    }
+
+    public void setManager(UserModel manager) {
+        this.manager = manager;
     }
 }

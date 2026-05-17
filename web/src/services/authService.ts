@@ -22,6 +22,7 @@ export type ApiUser = {
   email: string;
   phone: string;
   cpf: string;
+  profilePhoto?: string | null;
   userRole: ApiUserRole;
   active: boolean;
 };
@@ -107,6 +108,7 @@ export function syncUserMockWithApiUser(user: ApiUser) {
   userMock.email = user.email;
   userMock.telefone = user.phone;
   userMock.cargo = cargo;
+  userMock.foto = user.profilePhoto ?? undefined;
   userMock.permissoes = getPermissionsByRole(cargo);
 }
 

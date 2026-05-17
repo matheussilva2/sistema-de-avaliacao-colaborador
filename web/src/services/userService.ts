@@ -9,7 +9,7 @@ export type UserFormPayload = {
   name: string;
   lastName: string;
   email: string;
-  passWord: string;
+  passWord?: string;
   phone: string;
   cpf: string;
   userRole: ApiUserRole;
@@ -18,6 +18,12 @@ export type UserFormPayload = {
 
 export function getUsers() {
   return request<ApiUser[]>("/users", {
+    method: "GET",
+  });
+}
+
+export function getEmployeesByManager(managerId: string) {
+  return request<ApiUser[]>(`/users/managers/${managerId}/employees`, {
     method: "GET",
   });
 }
@@ -35,10 +41,27 @@ export function createUser(payload: CreateUserPayload) {
   });
 }
 
+export function createEmployeeForManager(
+  managerId: string,
+  payload: CreateUserPayload,
+) {
+  return request<ApiUser>(`/users/managers/${managerId}/employees`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function updateUser(id: string, payload: UserFormPayload) {
   return request<ApiUser>(`/users/${id}`, {
     method: "PUT",
     body: JSON.stringify(payload),
+  });
+}
+
+export function updateUserPhoto(id: string, profilePhoto: string) {
+  return request<ApiUser>(`/users/${id}/photo`, {
+    method: "PUT",
+    body: JSON.stringify({ profilePhoto }),
   });
 }
 

@@ -2,8 +2,8 @@ import { Button } from "@heroui/react";
 import { Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { deleteUser, getUsers } from "../../services/userService";
-import type { ApiUser } from "../../services/authService";
+import { deleteUser, getEmployeesByManager } from "../../services/userService";
+import { getAuthenticatedUser, type ApiUser } from "../../services/authService";
 
 export default function Colaboradores() {
   const [colaboradores, setColaboradores] = useState<ApiUser[]>([]);
@@ -14,11 +14,19 @@ export default function Colaboradores() {
 
   useEffect(() => {
     async function loadUsers() {
+      const manager = getAuthenticatedUser();
+
+      if (!manager || manager.userRole !== "MANAGER") {
+        setErrorMessage("Faca login como gestor para visualizar colaboradores.");
+        setIsLoading(false);
+        return;
+      }
+
       try {
-        const users = await getUsers();
+        const users = await getEmployeesByManager(manager.id);
         setColaboradores(users);
       } catch {
-        setErrorMessage("Nao foi possivel carregar os usuarios. Verifique se a API esta rodando.");
+        setErrorMessage("Nao foi possivel carregar os colaboradores deste gestor.");
       } finally {
         setIsLoading(false);
       }

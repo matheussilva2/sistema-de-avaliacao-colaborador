@@ -1,6 +1,7 @@
 package com.avaliacao.api.service;
 
 import com.avaliacao.api.dtos.TrainingRecordDTO;
+import com.avaliacao.api.enums.UserRole;
 import com.avaliacao.api.models.TrainingModel;
 import com.avaliacao.api.models.UserModel;
 import com.avaliacao.api.repositories.TrainingRepository;
@@ -28,12 +29,28 @@ public class TrainingService {
     public TrainingModel create(TrainingRecordDTO trainingRecordDTO){
         var training = new TrainingModel();
         BeanUtils.copyProperties(trainingRecordDTO,training);
+        setManagerIfPresent(training, trainingRecordDTO.managerId());
+
+        return trainingRepository.save(training);
+    }
+
+    public TrainingModel createForManager(UUID managerId, TrainingRecordDTO trainingRecordDTO){
+        var manager = getManagerOrThrow(managerId);
+        var training = new TrainingModel();
+
+        BeanUtils.copyProperties(trainingRecordDTO,training);
+        training.setManager(manager);
 
         return trainingRepository.save(training);
     }
 
     public List<TrainingModel> findAll(){
         return trainingRepository.findAll();
+    }
+
+    public List<TrainingModel> findByManager(UUID managerId){
+        getManagerOrThrow(managerId);
+        return trainingRepository.findByManager_Id(managerId);
     }
 
     public Optional<TrainingModel> findById(UUID id){
@@ -49,6 +66,7 @@ public class TrainingService {
 
         var training = trainingO.get();
         BeanUtils.copyProperties(trainingRecordDTO,training);
+        setManagerIfPresent(training, trainingRecordDTO.managerId());
 
         return Optional.of(trainingRepository.save(training));
 
@@ -105,5 +123,23 @@ public class TrainingService {
         }
 
         return Optional.of(trainingO.get().getUsers());
+    }
+
+    private UserModel getManagerOrThrow(UUID managerId){
+        var managerO = userRepository.findById(managerId);
+
+        if(managerO.isEmpty() || managerO.get().getUserRole() != UserRole.MANAGER){
+            throw new IllegalArgumentException("Manager not found.");
+        }
+
+        return managerO.get();
+    }
+
+    private void setManagerIfPresent(TrainingModel training, UUID managerId){
+        if(managerId == null){
+            return;
+        }
+
+        training.setManager(getManagerOrThrow(managerId));
     }
 }

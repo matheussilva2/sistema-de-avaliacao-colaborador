@@ -28,10 +28,26 @@ public class UserModel {
     private String phone;
     private String cpf;
 
+    @Lob
+    @Column(columnDefinition = "LONGTEXT")
+    private String profilePhoto;
+
     @Enumerated(EnumType.STRING)
     private UserRole userRole;
 
     private boolean active;
+
+    @ManyToOne
+    @JoinColumn(name = "manager_id")
+    private UserModel manager;
+
+    @JsonIgnore
+    @OneToMany(mappedBy = "manager")
+    private Set<UserModel> employees = new HashSet<>();
+
+    @JsonIgnore
+    @OneToMany(mappedBy = "manager")
+    private Set<TrainingModel> managedTrainings = new HashSet<>();
 
     @JsonIgnore
     @ManyToMany(mappedBy = "users")
@@ -85,6 +101,14 @@ public class UserModel {
         this.cpf = cpf;
     }
 
+    public String getProfilePhoto() {
+        return profilePhoto;
+    }
+
+    public void setProfilePhoto(String profilePhoto) {
+        this.profilePhoto = profilePhoto;
+    }
+
     public UserRole getUserRole() {
         return userRole;
     }
@@ -115,5 +139,29 @@ public class UserModel {
 
     public void setTrainings(Set<TrainingModel> trainings) {
         this.trainings = trainings;
+    }
+
+    public UserModel getManager() {
+        return manager;
+    }
+
+    public void setManager(UserModel manager) {
+        this.manager = manager;
+    }
+
+    public Set<UserModel> getEmployees() {
+        return employees;
+    }
+
+    public void setEmployees(Set<UserModel> employees) {
+        this.employees = employees;
+    }
+
+    public Set<TrainingModel> getManagedTrainings() {
+        return managedTrainings;
+    }
+
+    public void setManagedTrainings(Set<TrainingModel> managedTrainings) {
+        this.managedTrainings = managedTrainings;
     }
 }

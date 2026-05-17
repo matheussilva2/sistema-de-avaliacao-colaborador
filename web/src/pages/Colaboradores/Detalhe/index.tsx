@@ -83,7 +83,7 @@ export default function ColaboradorDetalhe() {
         email: form.email,
         phone: form.telefone,
         passWord: form.senha,
-        userRole: form.userRole,
+        userRole: "EMPLOYEE",
         active: form.situacao === "Ativo",
       });
 
@@ -262,14 +262,11 @@ export default function ColaboradorDetalhe() {
               <Label className="text-primary-700 font-semibold text-sm">
                 Tipo de usuario
               </Label>
-              <select
-                value={form.userRole}
-                onChange={(e) => handleFieldChange("userRole", e.target.value)}
-                className="bg-white border rounded-xl h-10 px-3"
-              >
-                <option value="EMPLOYEE">Colaborador</option>
-                <option value="MANAGER">Gestor</option>
-              </select>
+              <Input
+                value="Colaborador"
+                className="bg-white"
+                readOnly
+              />
             </div>
 
             <div className="flex flex-col gap-3">
