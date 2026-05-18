@@ -4,11 +4,13 @@ import com.avaliacao.api.models.TrainingModel;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.UUID;
 
 
 @Repository
 public interface TrainingRepository extends JpaRepository<TrainingModel, UUID> {
+    List<TrainingModel> findByManager_Id(UUID managerId);
 
 }
 

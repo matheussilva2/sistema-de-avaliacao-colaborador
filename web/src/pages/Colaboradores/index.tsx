@@ -1,25 +1,60 @@
 import { Button } from "@heroui/react";
 import { Search } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { colaboradores as colaboradoresMock } from "../../mock";
+import { deleteUser, getEmployeesByManager } from "../../services/userService";
+import { getAuthenticatedUser, type ApiUser } from "../../services/authService";
 
 export default function Colaboradores() {
-  const [colaboradores, setColaboradores] = useState(colaboradoresMock);
+  const [colaboradores, setColaboradores] = useState<ApiUser[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
   const navigate = useNavigate();
 
-  const filtrados = colaboradores.filter((c) =>
-    c.nome.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  useEffect(() => {
+    async function loadUsers() {
+      const manager = getAuthenticatedUser();
 
-  const handleRowClick = (id: number) => {
+      if (!manager || manager.userRole !== "MANAGER") {
+        setErrorMessage("Faca login como gestor para visualizar colaboradores.");
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const users = await getEmployeesByManager(manager.id);
+        setColaboradores(users);
+      } catch {
+        setErrorMessage("Nao foi possivel carregar os colaboradores deste gestor.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadUsers();
+  }, []);
+
+  const filtrados = useMemo(() => {
+    return colaboradores.filter((user) => {
+      const fullName = `${user.name} ${user.lastName}`.toLowerCase();
+      return fullName.includes(searchTerm.toLowerCase());
+    });
+  }, [colaboradores, searchTerm]);
+
+  const handleRowClick = (id: string) => {
     navigate(`/painel/colaboradores/${id}`);
   };
 
-  const handleDelete = (id: number) => {
-    setColaboradores((prev) => prev.filter((c) => c.id !== id));
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteUser(id);
+      setColaboradores((prev) => prev.filter((user) => user.id !== id));
+    } catch {
+      setErrorMessage("Nao foi possivel deletar o usuario.");
+    }
   };
+
   return (
     <div className="p-8 bg-neutral-50 min-h-screen">
       <div className="mb-6 flex items-center justify-between gap-4">
@@ -43,6 +78,12 @@ export default function Colaboradores() {
         </Button>
       </div>
 
+      {errorMessage && (
+        <p className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
+          {errorMessage}
+        </p>
+      )}
+
       <div className="bg-white rounded-md shadow overflow-hidden">
         <table className="w-full text-left">
           <thead className="bg-gray-100 ">
@@ -58,37 +99,31 @@ export default function Colaboradores() {
           </thead>
 
           <tbody>
-            {filtrados.map((c) => (
+            {filtrados.map((user) => (
               <tr
-                key={c.id}
+                key={user.id}
                 className="border-t hover:bg-neutral-50 cursor-pointer"
-                onClick={() => handleRowClick(c.id)}
+                onClick={() => handleRowClick(user.id)}
               >
-                <td className="p-4">{c.id}</td>
-                <td className="p-4">{c.cpf}</td>
-                <td className="p-4">{c.nome}</td>
-                <td className="p-4">{c.email}</td>
-                <td className="p-4">{c.cargo}</td>
+                <td className="p-4">{user.id.slice(0, 8)}</td>
+                <td className="p-4">{user.cpf}</td>
+                <td className="p-4">{user.name} {user.lastName}</td>
+                <td className="p-4">{user.email}</td>
                 <td className="p-4">
-                  {/* <span
-                    className={`px-2 py-1 rounded-full text-sm ${
-                      c.situacao === "Ativo"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-red-100 text-red-700"
-                    }`}
-                  > */}
-                  {c.situacao}
-                  {/* </span> */}
+                  {user.userRole === "MANAGER" ? "Gestor" : "Colaborador"}
+                </td>
+                <td className="p-4">
+                  {user.active ? "Ativo" : "Inativo"}
                 </td>
                 <td
                   className="p-4"
-                  onClick={(e) => e.stopPropagation()} // evita disparar o clique da linha
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <Button
                     size="sm"
                     className="bg-red-500 hover:bg-red-700 text-sm rounded-md"
                     onClick={() => {
-                      handleDelete(c.id);
+                      handleDelete(user.id);
                     }}
                   >
                     Deletar
@@ -99,7 +134,13 @@ export default function Colaboradores() {
           </tbody>
         </table>
 
-        {filtrados.length === 0 && (
+        {isLoading && (
+          <div className="p-6 text-center text-neutral-500">
+            Carregando usuarios...
+          </div>
+        )}
+
+        {!isLoading && filtrados.length === 0 && (
           <div className="p-6 text-center text-neutral-500">
             Nenhum colaborador encontrado
           </div>

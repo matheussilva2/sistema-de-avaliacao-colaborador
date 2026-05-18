@@ -6,11 +6,11 @@ import jakarta.validation.constraints.NotNull;
 
 import java.util.UUID;
 
-public record UserRecordDTO(
+public record UserUpdateRecordDTO(
         @NotBlank String name,
         @NotBlank String lastName,
         @NotBlank String email,
-        @NotBlank String passWord,
+        String passWord,
         @NotBlank String phone,
         @NotBlank String cpf,
         @NotNull UserRole userRole,
