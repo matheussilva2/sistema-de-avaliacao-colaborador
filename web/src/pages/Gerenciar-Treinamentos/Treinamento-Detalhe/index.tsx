@@ -1,9 +1,9 @@
 import { Card, Button, Input, Label } from "@heroui/react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
-import TrainingAnalyticsCharts from "./components/TrainingAnalyticsCharts";
-import { getTrainingAnalyticsById } from "../mocks/trainingAnalytics";
-import { getFormsByTrainingId, trainingFormTypeLabel } from "../mocks/trainingForms";
+import TrainingAnalyticsCharts, {
+  type StudentTrainingAnalytics,
+} from "./components/TrainingAnalyticsCharts";
 import { type ChangeEvent, type FormEvent, useEffect, useState } from "react";
 import {
   getTrainingById,
@@ -13,15 +13,40 @@ import {
   updateTrainingImage,
 } from "../../../services/trainingService";
 import type { ApiUser } from "../../../services/authService";
+import {
+  getFormQuestions,
+  getTrainingResults,
+  getTrainingForms,
+  type ApiFormAnswer,
+  type ApiForm,
+  type ApiFormType,
+} from "../../../services/formService";
+
+type TrainingFormSummary = ApiForm & {
+  questionCount: number;
+};
+
+type StudentStats = {
+  preScore: number | null;
+  postScore: number | null;
+  gain: number | null;
+  answeredForms: number;
+  totalForms: number;
+  progress: number;
+};
 
 export default function TreinamentoDetalhes() {
   const navigate = useNavigate();
   const { id } = useParams();
   const [training, setTraining] = useState<ApiTraining | null>(null);
   const [linkedUsers, setLinkedUsers] = useState<ApiUser[]>([]);
+  const [trainingForms, setTrainingForms] = useState<TrainingFormSummary[]>([]);
+  const [trainingResults, setTrainingResults] = useState<ApiFormAnswer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showFormsList, setShowFormsList] = useState(false);
+  const [showStudentsList, setShowStudentsList] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [form, setForm] = useState({
@@ -32,11 +57,6 @@ export default function TreinamentoDetalhes() {
     description: "",
   });
 
-  const numericMockId = Number(id);
-  const hasNumericMockId = Number.isFinite(numericMockId);
-  const analytics = hasNumericMockId ? getTrainingAnalyticsById(numericMockId) : null;
-  const forms = hasNumericMockId ? getFormsByTrainingId(numericMockId) : [];
-
   useEffect(() => {
     async function loadTraining() {
       if (!id) {
@@ -44,12 +64,27 @@ export default function TreinamentoDetalhes() {
       }
 
       try {
-        const [trainingData, trainingUsers] = await Promise.all([
+        const [trainingData, trainingUsers, apiForms, apiResults] = await Promise.all([
           getTrainingById(id),
           getTrainingUsers(id),
+          getTrainingForms(id),
+          getTrainingResults(id).catch(() => []),
         ]);
+        const formsWithQuestionCount = await Promise.all(
+          apiForms.map(async (formItem) => {
+            const questions = await getFormQuestions(formItem.idForm);
+
+            return {
+              ...formItem,
+              questionCount: questions.length,
+            };
+          }),
+        );
+
         setTraining(trainingData);
         setLinkedUsers(trainingUsers);
+        setTrainingForms(formsWithQuestionCount);
+        setTrainingResults(apiResults);
         setForm({
           title: trainingData.title,
           workload: String(trainingData.workload),
@@ -133,8 +168,10 @@ export default function TreinamentoDetalhes() {
   if (isLoading) return <div className="p-8 text-neutral-600">Carregando treinamento...</div>;
   if (!training) return <div className="p-8 text-red-700">{errorMessage || "Nenhum treinamento com esse id"}</div>;
 
-  const preTestForms = forms.filter((form) => form.type === "pre-teste");
-  const postTestForms = forms.filter((form) => form.type === "pos-teste");
+  const preTestForms = trainingForms.filter((formItem) => formItem.formType === "PRE_TEST");
+  const postTestForms = trainingForms.filter((formItem) => formItem.formType === "POST_TEST");
+  const studentStats = buildStudentStats(linkedUsers, trainingForms, trainingResults);
+  const analyticsStudents = buildAnalyticsStudents(linkedUsers, studentStats);
 
   return (
     <div className="p-8 bg-neutral-50 min-h-screen">
@@ -320,12 +357,24 @@ export default function TreinamentoDetalhes() {
             </p>
           </div>
 
-          <Button
-            className="bg-primary text-white"
-            onPress={() => navigate(`/painel/gerenciar-treinamentos/${training.idTraining}/formularios`)}
-          >
-            Gerenciar formularios
-          </Button>
+          <div className="flex flex-row items-center gap-2">
+            <Button
+              className="bg-primary text-white"
+              onPress={() =>
+                navigate(
+                  `/painel/gerenciar-treinamentos/${training.idTraining}/formularios?acao=novo`,
+                )
+              }
+            >
+              Adicionar formulario +
+            </Button>
+            <Button
+              className="bg-white text-primary border border-primary"
+              onPress={() => setShowFormsList((current) => !current)}
+            >
+              {showFormsList ? "Ocultar formularios" : "Visualizar formularios"}
+            </Button>
+          </div>
         </div>
 
         <div className="mt-5 grid gap-3 md:grid-cols-3">
@@ -343,9 +392,22 @@ export default function TreinamentoDetalhes() {
           </div>
           <div className="rounded-md bg-primary-50 p-4">
             <span className="text-sm text-neutral-600">Total</span>
-            <p className="text-xl font-bold text-primary">{forms.length}</p>
+            <p className="text-xl font-bold text-primary">{trainingForms.length}</p>
           </div>
         </div>
+
+        {showFormsList && (
+          <div className="mt-5">
+            <FormListGroup
+              forms={trainingForms}
+              onOpen={(formId) =>
+                navigate(
+                  `/painel/gerenciar-treinamentos/${training.idTraining}/formularios?formId=${formId}`,
+                )
+              }
+            />
+          </div>
+        )}
       </Card>
 
       {/* GRID PRINCIPAL */}
@@ -361,30 +423,42 @@ export default function TreinamentoDetalhes() {
             </span>
           </div>
 
-          <div className="flex justify-end mb-4">
+          <div className="mb-4 flex flex-row items-center justify-end gap-2">
             <Button
               className="bg-primary text-white"
               onPress={() => navigate(`/painel/gerenciar-treinamentos/${training.idTraining}/adicionar-alunos`)}
             >
               Adicionar Alunos +
             </Button>
+            <Button
+              className="bg-white text-primary border border-primary"
+              onPress={() => setShowStudentsList((current) => !current)}
+            >
+              {showStudentsList ? "Ocultar alunos" : "Visualizar alunos"}
+            </Button>
           </div>
 
-          <div className="flex flex-col gap-3">
-            {linkedUsers.map((user) => (
-              <LinkedStudentCard key={user.id} user={user} />
-            ))}
-            {linkedUsers.length === 0 && (
-              <p className="text-sm text-neutral-600">
-                Nenhum aluno vinculado a este treinamento ainda.
-              </p>
-            )}
-          </div>
+          {showStudentsList && (
+            <div className="flex flex-col gap-3">
+              {linkedUsers.map((user) => (
+                <LinkedStudentCard
+                  key={user.id}
+                  user={user}
+                  stats={studentStats[user.id] ?? createEmptyStudentStats(trainingForms.length)}
+                />
+              ))}
+              {linkedUsers.length === 0 && (
+                <p className="text-sm text-neutral-600">
+                  Nenhum aluno vinculado a este treinamento ainda.
+                </p>
+              )}
+            </div>
+          )}
         </Card>
 
         <Card className="p-6 col-span-2">
-          {analytics ? (
-            <TrainingAnalyticsCharts students={analytics.students} />
+          {analyticsStudents.length > 0 ? (
+            <TrainingAnalyticsCharts students={analyticsStudents} />
           ) : (
             <div>
               <h2 className="text-lg font-semibold text-primary">
@@ -392,38 +466,24 @@ export default function TreinamentoDetalhes() {
               </h2>
               <p className="mt-2 text-sm text-neutral-600">
                 As estatisticas reais aparecerao quando houver formularios
-                respondidos por colaboradores. Os graficos anteriores vinham de
-                dados mocados e foram removidos para este treinamento real.
+                respondidos por colaboradores nos pre-testes e pos-testes.
               </p>
             </div>
           )}
         </Card>
 
-        {/* AVALIAÇÕES */}
-        <Card className="p-6 col-span-2">
-          <h2 className="text-lg font-semibold text-primary mb-4">
-            Avaliações
-          </h2>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <FormListGroup
-              title="Pre-teste"
-              forms={preTestForms}
-              onOpen={() => navigate(`/painel/gerenciar-treinamentos/${training.idTraining}/formularios?tipo=pre-teste`)}
-            />
-            <FormListGroup
-              title="Pos-teste"
-              forms={postTestForms}
-              onOpen={() => navigate(`/painel/gerenciar-treinamentos/${training.idTraining}/formularios?tipo=pos-teste`)}
-            />
-          </div>
-        </Card>
       </div>
     </div>
   );
 }
 
-function LinkedStudentCard({ user }: { user: ApiUser }) {
+function LinkedStudentCard({
+  user,
+  stats,
+}: {
+  user: ApiUser;
+  stats: StudentStats;
+}) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -465,22 +525,44 @@ function LinkedStudentCard({ user }: { user: ApiUser }) {
           <div className="grid gap-3 md:grid-cols-3">
             <div className="rounded-md bg-white p-4">
               <p className="text-sm text-neutral-600">Pre-teste</p>
-              <p className="mt-1 text-lg font-bold text-neutral-900">Sem dados</p>
+              <p className="mt-1 text-lg font-bold text-neutral-900">
+                {formatNullableScore(stats.preScore)}
+              </p>
             </div>
             <div className="rounded-md bg-white p-4">
               <p className="text-sm text-neutral-600">Pos-teste</p>
-              <p className="mt-1 text-lg font-bold text-neutral-900">Sem dados</p>
+              <p className="mt-1 text-lg font-bold text-neutral-900">
+                {formatNullableScore(stats.postScore)}
+              </p>
             </div>
             <div className="rounded-md bg-white p-4">
               <p className="text-sm text-neutral-600">Ganho</p>
-              <p className="mt-1 text-lg font-bold text-neutral-900">Sem dados</p>
+              <p
+                className={`mt-1 text-lg font-bold ${
+                  stats.gain !== null && stats.gain >= 0
+                    ? "text-green-700"
+                    : "text-red-700"
+                }`}
+              >
+                {stats.gain === null ? "Sem dados" : `${stats.gain >= 0 ? "+" : ""}${stats.gain.toFixed(1)}`}
+              </p>
             </div>
           </div>
 
-          <p className="mt-4 text-sm text-neutral-600">
-            As estatisticas do colaborador aparecerao aqui quando houver
-            formularios respondidos neste treinamento.
-          </p>
+          <div className="mt-4">
+            <div className="mb-2 flex items-center justify-between text-sm">
+              <span className="font-semibold text-neutral-700">Progresso no treinamento</span>
+              <span className="text-neutral-600">
+                {stats.answeredForms}/{stats.totalForms} formularios respondidos
+              </span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-neutral-300">
+              <div
+                className="h-full rounded-full bg-primary transition-all"
+                style={{ width: `${stats.progress}%` }}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -488,16 +570,15 @@ function LinkedStudentCard({ user }: { user: ApiUser }) {
 }
 
 type FormListGroupProps = {
-  title: string;
-  forms: ReturnType<typeof getFormsByTrainingId>;
-  onOpen: () => void;
+  forms: TrainingFormSummary[];
+  onOpen: (formId: string) => void;
 };
 
-function FormListGroup({ title, forms, onOpen }: FormListGroupProps) {
+function FormListGroup({ forms, onOpen }: FormListGroupProps) {
   return (
     <div className="rounded-md border border-gray-200 bg-neutral-50 p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="font-semibold text-neutral-900">{title}</h3>
+        <h3 className="font-semibold text-neutral-900">Formularios criados</h3>
         <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-neutral-600">
           {forms.length} formulario(s)
         </span>
@@ -506,20 +587,20 @@ function FormListGroup({ title, forms, onOpen }: FormListGroupProps) {
       <div className="flex flex-col gap-3">
         {forms.map((form) => (
           <button
-            key={form.id}
+            key={form.idForm}
             type="button"
-            onClick={onOpen}
+            onClick={() => onOpen(form.idForm)}
             className="rounded-md bg-white p-4 text-left shadow-sm transition hover:border-primary hover:shadow-md"
           >
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-primary">
-                  {trainingFormTypeLabel[form.type]}
+                  {trainingFormTypeLabel(form.formType)}
                 </p>
                 <h4 className="font-semibold text-neutral-900">{form.title}</h4>
               </div>
               <span className="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary">
-                {form.questions.length} perguntas
+                {form.questionCount} perguntas
               </span>
             </div>
 
@@ -527,19 +608,19 @@ function FormListGroup({ title, forms, onOpen }: FormListGroupProps) {
               <div>
                 <span>Inicio</span>
                 <p className="font-semibold text-neutral-900">
-                  {form.startDeadline}
+                  {form.initDate}
                 </p>
               </div>
               <div>
                 <span>Termino</span>
                 <p className="font-semibold text-neutral-900">
-                  {form.endDeadline}
+                  {form.endDate}
                 </p>
               </div>
               <div>
                 <span>Minimo</span>
                 <p className="font-semibold text-neutral-900">
-                  {form.minCorrect}%
+                  {form.minCorrectPercentage}%
                 </p>
               </div>
             </div>
@@ -554,4 +635,84 @@ function FormListGroup({ title, forms, onOpen }: FormListGroupProps) {
       </div>
     </div>
   );
+}
+
+function trainingFormTypeLabel(type: ApiFormType) {
+  return type === "PRE_TEST" ? "Pre-teste" : "Pos-teste";
+}
+
+function buildStudentStats(
+  users: ApiUser[],
+  forms: TrainingFormSummary[],
+  results: ApiFormAnswer[],
+) {
+  return users.reduce<Record<string, StudentStats>>((acc, user) => {
+    const userResults = results.filter((answer) => answer.user?.id === user.id);
+    const answeredFormIds = new Set(userResults.map((answer) => answer.form.idForm));
+    const answeredForms = forms.filter((form) => answeredFormIds.has(form.idForm)).length;
+    const preScore = averageScoreByType(userResults, "PRE_TEST");
+    const postScore = averageScoreByType(userResults, "POST_TEST");
+    const gain = preScore !== null && postScore !== null ? postScore - preScore : null;
+
+    acc[user.id] = {
+      preScore,
+      postScore,
+      gain,
+      answeredForms,
+      totalForms: forms.length,
+      progress: forms.length > 0 ? Math.round((answeredForms / forms.length) * 100) : 0,
+    };
+
+    return acc;
+  }, {});
+}
+
+function buildAnalyticsStudents(
+  users: ApiUser[],
+  statsByUser: Record<string, StudentStats>,
+): StudentTrainingAnalytics[] {
+  return users
+    .map((user) => {
+      const stats = statsByUser[user.id];
+
+      if (!stats || (stats.preScore === null && stats.postScore === null)) {
+        return null;
+      }
+
+      return {
+        nome: `${user.name} ${user.lastName}`,
+        quizResults: [
+          { phase: "pre" as const, score: stats.preScore ?? 0 },
+          { phase: "post" as const, score: stats.postScore ?? 0 },
+        ],
+      };
+    })
+    .filter((student): student is StudentTrainingAnalytics => Boolean(student));
+}
+
+function averageScoreByType(results: ApiFormAnswer[], type: ApiFormType) {
+  const scores = results
+    .filter((answer) => answer.form.formType === type)
+    .map((answer) => answer.scorePercentage / 10);
+
+  if (scores.length === 0) {
+    return null;
+  }
+
+  return scores.reduce((total, score) => total + score, 0) / scores.length;
+}
+
+function createEmptyStudentStats(totalForms: number): StudentStats {
+  return {
+    preScore: null,
+    postScore: null,
+    gain: null,
+    answeredForms: 0,
+    totalForms,
+    progress: 0,
+  };
+}
+
+function formatNullableScore(value: number | null) {
+  return value === null ? "Sem dados" : value.toFixed(1);
 }

@@ -1,14 +1,38 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, Card, Input } from "@heroui/react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { trainingsMock } from "../../../mock";
 import { TestFormSection } from "../Novo-Treinamento/components/TestFormSection";
 import type { Question, TestType } from "../Novo-Treinamento/types";
 import {
-  getFormsByTrainingId,
-  trainingFormTypeLabel,
-  type ManagedTrainingForm,
-} from "../mocks/trainingForms";
+  createFormQuestion,
+  createQuestionAlternative,
+  createTrainingForm,
+  deleteTrainingForm,
+  getFormQuestions,
+  getQuestionAlternatives,
+  getTrainingForms,
+  updateTrainingForm,
+  type ApiForm,
+  type ApiFormType,
+} from "../../../services/formService";
+import { getTrainingById, type ApiTraining } from "../../../services/trainingService";
+
+type ManagedTrainingForm = {
+  id: string;
+  persistedId?: string;
+  trainingId: string;
+  title: string;
+  type: TestType;
+  startDeadline: string;
+  endDeadline: string;
+  minCorrect: string;
+  questions: Question[];
+};
+
+const trainingFormTypeLabel: Record<TestType, string> = {
+  "pre-teste": "Pre-teste",
+  "pos-teste": "Pos-teste",
+};
 
 const createEmptyQuestion = (): Question => ({
   id: crypto.randomUUID(),
@@ -17,7 +41,7 @@ const createEmptyQuestion = (): Question => ({
 });
 
 const createEmptyForm = (
-  trainingId: number,
+  trainingId: string,
   type: TestType = "pre-teste",
 ): ManagedTrainingForm => ({
   id: crypto.randomUUID(),
@@ -32,7 +56,7 @@ const createEmptyForm = (
 
 type LocationState = {
   trainingDraft?: {
-    id: number;
+    id: string;
     title: string;
   };
 };
@@ -43,18 +67,52 @@ export default function FormulariosTreinamento() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const state = location.state as LocationState | null;
-  const trainingId = Number(id ?? state?.trainingDraft?.id ?? Date.now());
-  const training = trainingsMock.find((item) => item.id === trainingId);
+  const trainingId = id ?? state?.trainingDraft?.id ?? "";
   const defaultType = (searchParams.get("tipo") as TestType | null) ?? "pre-teste";
+  const selectedFormId = searchParams.get("formId");
 
-  const initialForms = useMemo(() => {
-    const existingForms = getFormsByTrainingId(trainingId);
-    if (existingForms.length > 0) return existingForms;
+  const [training, setTraining] = useState<ApiTraining | null>(null);
+  const [forms, setForms] = useState<ManagedTrainingForm[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
-    return [createEmptyForm(trainingId, defaultType)];
-  }, [defaultType, trainingId]);
+  useEffect(() => {
+    async function loadForms() {
+      if (!trainingId) {
+        setForms([createEmptyForm(crypto.randomUUID(), defaultType)]);
+        setIsLoading(false);
+        return;
+      }
 
-  const [forms, setForms] = useState<ManagedTrainingForm[]>(initialForms);
+      try {
+        const [trainingData, apiForms] = await Promise.all([
+          getTrainingById(trainingId),
+          getTrainingForms(trainingId),
+        ]);
+
+        setTraining(trainingData);
+
+        const hydratedForms = await Promise.all(
+          apiForms.map((form) => hydrateForm(trainingId, form)),
+        );
+
+        const selectedForm = selectedFormId
+          ? hydratedForms.find((form) => form.persistedId === selectedFormId)
+          : null;
+
+        setForms([selectedForm ?? createEmptyForm(trainingId, defaultType)]);
+      } catch {
+        setErrorMessage("Nao foi possivel carregar os formularios deste treinamento.");
+        setForms([createEmptyForm(trainingId || crypto.randomUUID(), defaultType)]);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadForms();
+  }, [defaultType, selectedFormId, trainingId]);
 
   const title = training?.title ?? state?.trainingDraft?.title ?? "Novo treinamento";
 
@@ -68,12 +126,23 @@ export default function FormulariosTreinamento() {
     );
   };
 
-  const addForm = (type: TestType) => {
-    setForms((prev) => [...prev, createEmptyForm(trainingId, type)]);
-  };
+  const removeForm = async (formId: string) => {
+    const form = forms.find((item) => item.id === formId);
 
-  const removeForm = (formId: string) => {
+    if (form?.persistedId) {
+      try {
+        await deleteTrainingForm(form.persistedId);
+      } catch {
+        setErrorMessage("Nao foi possivel remover o formulario.");
+        return;
+      }
+    }
+
     setForms((prev) => prev.filter((form) => form.id !== formId));
+
+    if (trainingId) {
+      navigate(`/painel/gerenciar-treinamentos/${trainingId}`);
+    }
   };
 
   const updateQuestions = (
@@ -171,10 +240,65 @@ export default function FormulariosTreinamento() {
     );
   };
 
-  const handleSave = () => {
-    console.log("FORMULARIOS DO TREINAMENTO:", forms);
-    navigate(id ? `/painel/gerenciar-treinamentos/${trainingId}` : "/painel/gerenciar-treinamentos");
+  const handleSave = async () => {
+    if (!trainingId) {
+      setErrorMessage("Salve o treinamento antes de criar formularios.");
+      return;
+    }
+
+    setIsSaving(true);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      for (const form of forms) {
+        if (!form.title || !form.startDeadline || !form.endDeadline) {
+          throw new Error("Campos obrigatorios ausentes.");
+        }
+
+        const payload = {
+          title: form.title,
+          formType: mapTestTypeToApi(form.type),
+          initDate: form.startDeadline,
+          endDate: form.endDeadline,
+          minCorrectPercentage: Number(form.minCorrect),
+        };
+
+        const savedForm = form.persistedId
+          ? await updateTrainingForm(form.persistedId, payload)
+          : await createTrainingForm(trainingId, payload);
+
+        if (!form.persistedId) {
+          for (const question of form.questions) {
+            if (!question.title) continue;
+
+            const savedQuestion = await createFormQuestion(savedForm.idForm, question.title);
+
+            for (const option of question.options) {
+              if (!option.text) continue;
+
+              await createQuestionAlternative(
+                savedQuestion.idQuestion,
+                option.text,
+                option.isCorrect,
+              );
+            }
+          }
+        }
+      }
+
+      setSuccessMessage("Formularios salvos com sucesso.");
+      navigate(`/painel/gerenciar-treinamentos/${trainingId}`);
+    } catch {
+      setErrorMessage("Nao foi possivel salvar os formularios. Confira os campos.");
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  if (isLoading) {
+    return <div className="p-8 text-neutral-600">Carregando formularios...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-neutral-50 p-8">
@@ -183,45 +307,40 @@ export default function FormulariosTreinamento() {
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <h1 className="text-2xl font-bold text-primary">
-                Formularios do treinamento
+                {selectedFormId ? "Editar formulario" : "Adicionar formulario"}
               </h1>
               <p className="mt-1 text-neutral-600">{title}</p>
             </div>
 
             <div className="flex flex-wrap gap-3">
               <Button
-                className="bg-blue-50 text-blue-700"
-                onPress={() => addForm("pre-teste")}
+                className="bg-white text-primary border border-primary"
+                onPress={() => navigate(`/painel/gerenciar-treinamentos/${trainingId}`)}
               >
-                + Pre-teste
-              </Button>
-              <Button
-                className="bg-green-50 text-green-700"
-                onPress={() => addForm("pos-teste")}
-              >
-                + Pos-teste
+                Voltar ao treinamento
               </Button>
             </div>
           </div>
         </Card>
 
-        {forms.map((form, index) => (
+        {forms.map((form) => (
           <Card key={form.id} className="p-6">
             <div className="mb-5 flex flex-col gap-4">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-neutral-500">
-                    Formulario {index + 1}
+                    Formulario do treinamento
                   </p>
                   <h2 className="text-xl font-semibold text-primary">
                     {trainingFormTypeLabel[form.type]}
                   </h2>
                 </div>
 
-                {forms.length > 1 && (
+                {form.persistedId && (
                   <Button
                     className="bg-red-50 text-red-700"
                     onPress={() => removeForm(form.id)}
+                    isDisabled={isSaving}
                   >
                     Remover formulario
                   </Button>
@@ -324,15 +443,70 @@ export default function FormulariosTreinamento() {
           </Card>
         ))}
 
+        {errorMessage && (
+          <p className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
+            {errorMessage}
+          </p>
+        )}
+
+        {successMessage && (
+          <p className="rounded-md bg-green-50 px-4 py-3 text-sm text-green-700">
+            {successMessage}
+          </p>
+        )}
+
         <div className="flex justify-end gap-3">
           <Button className="bg-neutral-300 text-neutral-800" onPress={() => navigate(-1)}>
             Cancelar
           </Button>
-          <Button className="bg-primary text-white px-8" onPress={handleSave}>
-            Salvar formularios
+          <Button
+            className="bg-primary text-white px-8"
+            onPress={handleSave}
+            isDisabled={isSaving}
+          >
+            {isSaving ? "Salvando..." : "Salvar formularios"}
           </Button>
         </div>
       </div>
     </div>
   );
+}
+
+function mapTestTypeToApi(type: TestType): ApiFormType {
+  return type === "pre-teste" ? "PRE_TEST" : "POST_TEST";
+}
+
+function mapApiFormType(type: ApiFormType): TestType {
+  return type === "PRE_TEST" ? "pre-teste" : "pos-teste";
+}
+
+async function hydrateForm(trainingId: string, form: ApiForm): Promise<ManagedTrainingForm> {
+  const questions = await getFormQuestions(form.idForm);
+  const hydratedQuestions = await Promise.all(
+    questions.map(async (question) => {
+      const alternatives = await getQuestionAlternatives(question.idQuestion);
+
+      return {
+        id: question.idQuestion,
+        title: question.title,
+        options: alternatives.map((alternative) => ({
+          id: alternative.idAlternative,
+          text: alternative.text,
+          isCorrect: alternative.correct,
+        })),
+      };
+    }),
+  );
+
+  return {
+    id: form.idForm,
+    persistedId: form.idForm,
+    trainingId,
+    title: form.title,
+    type: mapApiFormType(form.formType),
+    startDeadline: form.initDate,
+    endDeadline: form.endDate,
+    minCorrect: String(form.minCorrectPercentage),
+    questions: hydratedQuestions,
+  };
 }
