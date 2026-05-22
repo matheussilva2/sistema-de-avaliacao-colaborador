@@ -23,6 +23,10 @@ public class TrainingModel implements Serializable {
     private int workload;
     private String description;
 
+    @Lob
+    @Column(columnDefinition = "LONGTEXT")
+    private String trainingImage;
+
     @ManyToOne
     @JoinColumn(name = "manager_id")
     private UserModel manager;
@@ -81,6 +85,14 @@ public class TrainingModel implements Serializable {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getTrainingImage() {
+        return trainingImage;
+    }
+
+    public void setTrainingImage(String trainingImage) {
+        this.trainingImage = trainingImage;
     }
 
     public Set<UserModel> getUsers() {
