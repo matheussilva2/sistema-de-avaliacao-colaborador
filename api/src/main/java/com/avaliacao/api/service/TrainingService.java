@@ -1,5 +1,6 @@
 package com.avaliacao.api.service;
 
+import com.avaliacao.api.dtos.TrainingImageRecordDTO;
 import com.avaliacao.api.dtos.TrainingRecordDTO;
 import com.avaliacao.api.enums.UserRole;
 import com.avaliacao.api.models.TrainingModel;
@@ -70,6 +71,19 @@ public class TrainingService {
 
         return Optional.of(trainingRepository.save(training));
 
+    }
+
+    public Optional<TrainingModel> updateImage(UUID id, TrainingImageRecordDTO trainingImageRecordDTO){
+        var trainingO = trainingRepository.findById(id);
+
+        if(trainingO.isEmpty()){
+            return Optional.empty();
+        }
+
+        var training = trainingO.get();
+        training.setTrainingImage(trainingImageRecordDTO.trainingImage());
+
+        return Optional.of(trainingRepository.save(training));
     }
 
     public boolean delete(UUID id){

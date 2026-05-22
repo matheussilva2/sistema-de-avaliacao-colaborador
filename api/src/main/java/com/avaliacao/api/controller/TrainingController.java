@@ -1,5 +1,6 @@
 package com.avaliacao.api.controller;
 
+import com.avaliacao.api.dtos.TrainingImageRecordDTO;
 import com.avaliacao.api.dtos.TrainingRecordDTO;
 import com.avaliacao.api.models.TrainingModel;
 import com.avaliacao.api.models.UserModel;
@@ -134,6 +135,23 @@ public class TrainingController {
         return ResponseEntity
                 .status(HttpStatus.OK)
                 .body(tainingO.get());
+    }
+
+    @PutMapping("/{id}/image")
+    public ResponseEntity<Object> updateTrainingImage(@PathVariable(value = "id") UUID id,
+                                                      @RequestBody @Valid TrainingImageRecordDTO trainingImageRecordDTO){
+
+        Optional<TrainingModel> trainingO = trainingService.updateImage(id,trainingImageRecordDTO);
+
+        if(trainingO.isEmpty()){
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body("Training not found.");
+        }
+
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(trainingO.get());
     }
 
 

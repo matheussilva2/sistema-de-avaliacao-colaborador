@@ -4,6 +4,7 @@ import {
   type ApiUserRole,
   type CreateUserPayload,
 } from "./authService";
+import type { ApiTraining } from "./trainingService";
 
 export type UserFormPayload = {
   name: string;
@@ -68,5 +69,11 @@ export function updateUserPhoto(id: string, profilePhoto: string) {
 export function deleteUser(id: string) {
   return request<string>(`/users/${id}`, {
     method: "DELETE",
+  });
+}
+
+export function getUserTrainings(userId: string) {
+  return request<ApiTraining[]>(`/users/${userId}/trainings`, {
+    method: "GET",
   });
 }

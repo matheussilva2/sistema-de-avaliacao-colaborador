@@ -40,45 +40,74 @@ export function BasicTrainingForm({
           )}
         </div>
 
-        <Input
-          placeholder="Título do treinamento"
-          value={form.title}
-          onChange={(e) => onChange("title", e.target.value)}
-          className="bg-white border-2 border-neutral-300 focus:border-primary focus:ring-2 focus:ring-primary/20"
-        />
-
-        <div className="grid grid-cols-3 gap-4">
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-medium text-neutral-700">
+            Titulo do treinamento
+          </label>
           <Input
-            type="number"
-            placeholder="Carga horária (h)"
-            value={form.hours}
-            onChange={(e) => onChange("hours", e.target.value)}
+            placeholder="Titulo do treinamento"
+            value={form.title}
+            onChange={(e) => onChange("title", e.target.value)}
             className="bg-white border-2 border-neutral-300 focus:border-primary focus:ring-2 focus:ring-primary/20"
-          />
-
-          <Input
-            type="text"
-            placeholder="Data de início (ex: 20/05)"
-            value={form.startDate}
-            onChange={(e) => onChange("startDate", e.target.value)}
-            className="bg-white border-2 border-neutral-300 focus:border-primary focus:ring-2 focus:ring-primary/20"
-          />
-
-          <Input
-            type="text"
-            placeholder="Data de término (ex: 30/06)"
-            value={form.endDate}
-            onChange={(e) => onChange("endDate", e.target.value)}
-            className="bg-white border-2 border-neutral-300 focus:border-primary focus:ring-2 focus:ring-primary/20"
+            required
           />
         </div>
 
-        <textarea
-          placeholder="Descrição do treinamento..."
-          value={form.description}
-          onChange={(e) => onChange("description", e.target.value)}
-          className="bg-white border-2 border-neutral-300 rounded-md p-3 text-sm outline-none resize-none min-h-[120px] focus:border-primary focus:ring-2 focus:ring-primary/20"
-        />
+        <div className="grid grid-cols-3 gap-4">
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-neutral-700">
+              Carga horaria
+            </label>
+            <Input
+              type="number"
+              min="1"
+              placeholder="Carga horaria (h)"
+              value={form.hours}
+              onChange={(e) => onChange("hours", e.target.value)}
+              className="bg-white border-2 border-neutral-300 focus:border-primary focus:ring-2 focus:ring-primary/20"
+              required
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-neutral-700">
+              Data de inicio
+            </label>
+            <Input
+              type="date"
+              value={form.startDate}
+              onChange={(e) => onChange("startDate", e.target.value)}
+              className="bg-white border-2 border-neutral-300 focus:border-primary focus:ring-2 focus:ring-primary/20"
+              required
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-neutral-700">
+              Data de termino
+            </label>
+            <Input
+              type="date"
+              value={form.endDate}
+              onChange={(e) => onChange("endDate", e.target.value)}
+              className="bg-white border-2 border-neutral-300 focus:border-primary focus:ring-2 focus:ring-primary/20"
+              required
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-medium text-neutral-700">
+            Descricao
+          </label>
+          <textarea
+            placeholder="Descricao do treinamento..."
+            value={form.description}
+            onChange={(e) => onChange("description", e.target.value)}
+            className="bg-white border-2 border-neutral-300 rounded-md p-3 text-sm outline-none resize-none min-h-[120px] focus:border-primary focus:ring-2 focus:ring-primary/20"
+            required
+          />
+        </div>
       </div>
     </Card>
   );

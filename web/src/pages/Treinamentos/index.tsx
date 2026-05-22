@@ -1,133 +1,92 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button, Input, Card } from "@heroui/react";
-import { Clock } from "lucide-react";
-import type { Training } from "../../types/Training";
-import { trainingsMock } from "../../mock";
-import { useNavigate } from "react-router-dom"; // 👈 add
+import { Clock, CalendarDays, Eye, EyeOff } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { getAuthenticatedUser } from "../../services/authService";
+import { getUserTrainings } from "../../services/userService";
+import type { ApiTraining } from "../../services/trainingService";
 
 type StatusFilter = "todos" | "em_andamento" | "concluido" | "oculto";
+const hiddenStudentTrainingsKey = "hiddenStudentTrainings";
 
 export const Treinamentos = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<StatusFilter>("todos");
-  const [allTrainings, setAllTrainings] = useState<Training[]>(trainingsMock);
-  const [trainings, setTrainings] = useState<Training[]>([]);
-  const [hiddenStatusMap, setHiddenStatusMap] = useState<Record<number, Training["status"]>>({});
+  const [trainings, setTrainings] = useState<ApiTraining[]>([]);
+  const [hiddenTrainingIds, setHiddenTrainingIds] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const navigate = useNavigate(); // 👈 add
+  const navigate = useNavigate();
 
   useEffect(() => {
-    let result = allTrainings;
+    const storedHiddenTrainings = localStorage.getItem(hiddenStudentTrainingsKey);
 
-    if (searchTerm !== "") {
-      result = result.filter((training) =>
-        training.title.toLowerCase().includes(searchTerm.toLowerCase()),
-      );
+    if (storedHiddenTrainings) {
+      setHiddenTrainingIds(JSON.parse(storedHiddenTrainings) as string[]);
+    }
+  }, []);
+
+  useEffect(() => {
+    async function loadTrainings() {
+      const user = getAuthenticatedUser();
+
+      if (!user) {
+        setErrorMessage("Faca login para visualizar seus treinamentos.");
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const userTrainings = await getUserTrainings(user.id);
+        setTrainings(userTrainings);
+      } catch {
+        setErrorMessage("Nao foi possivel carregar seus treinamentos.");
+      } finally {
+        setIsLoading(false);
+      }
     }
 
-    if (selectedStatus === "oculto") {
-      result = result.filter((training) => training.status === "oculto");
-    } else if (selectedStatus !== "todos") {
-      result = result.filter((training) => training.status === selectedStatus);
-    } else {
-      result = result.filter((training) => training.status !== "oculto");
-    }
+    loadTrainings();
+  }, []);
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setTrainings(result);
-  }, [selectedStatus, searchTerm, allTrainings]);
+  const filteredTrainings = useMemo(() => {
+    return trainings.filter((training) => {
+      const matchesSearch = training.title
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase());
+      const isConcluded = isTrainingConcluded(training.endDate);
+      const isHidden = hiddenTrainingIds.includes(training.idTraining);
 
-  const handleClick = (id: number) => {
-    navigate(`/painel/treinamentos/${id}`); // 👈 rota de detalhes
-  };
+      if (!matchesSearch) {
+        return false;
+      }
 
-  const toggleOculto = (id: number) => {
-    const training = allTrainings.find((t) => t.id === id);
-    if (!training) return;
+      if (selectedStatus === "oculto") {
+        return isHidden;
+      }
 
-    if (training.status === "oculto") {
-      const originalStatus = hiddenStatusMap[id] ?? "em_andamento";
-      setAllTrainings((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, status: originalStatus } : t)),
-      );
-      setHiddenStatusMap((prev) => {
-        const next = { ...prev };
-        delete next[id];
-        return next;
-      });
-    } else {
-      setHiddenStatusMap((prev) => ({ ...prev, [id]: training.status }));
-      setAllTrainings((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, status: "oculto" } : t)),
-      );
-    }
-  };
+      if (selectedStatus === "concluido") {
+        return !isHidden && isConcluded;
+      }
 
-  const getButtonStyle = (training: Training) => {
-    switch (training.status) {
-      case "em_andamento":
-        if (training.daysLeft) {
-          return {
-            bgColor: "#F5A623",
-            text: `Expira em ${training.daysLeft} dias`,
-          };
-        } else {
-          return {
-            bgColor: "#006FEE",
-            text: "Em Andamento",
-          };
-        }
-      case "avaliacao":
-        return {
-          bgColor: "#17C964",
-          text: "Avaliação Final Disponível",
-        };
-      case "pre_avaliacao":
-        return {
-          bgColor: "#006FEE",
-          text: "Pré-avaliação Disponível",
-        };
-      case "pendencia":
-        return {
-          bgColor: "#616161",
-          text: "Concluído com Pendências",
-        };
-      case "aguardando_feedback":
-        return {
-          bgColor: "#616161",
-          text: "Aguardando Feedback",
-        };
-      case "concluido":
-        return {
-          bgColor: "#BDBDBD",
-          text: "Concluído",
-        };
-      case "oculto":
-        return {
-          bgColor: "#999",
-          text: "Oculto",
-        };
-    }
-  };
+      if (selectedStatus === "em_andamento") {
+        return !isHidden && !isConcluded;
+      }
 
-  const getProgressBarColor = (training: Training) => {
-    switch (training.status) {
-      case "pre_avaliacao":
-        return "#006FEE";
-      case "em_andamento":
-        // Se houver daysLeft, retorna vermelho, senão azul
-        return training.daysLeft ? "#F5A623" : "#006FEE";
-      case "avaliacao":
-        return "#006FEE";
-      case "aguardando_feedback":
-        return "#BDBDBD";
-      case "concluido":
-        return "#17C964";
-      case "pendencia":
-        return "#F5A623";
-      default:
-        return "#F5A623";
-    }
+      return !isHidden;
+    });
+  }, [hiddenTrainingIds, searchTerm, selectedStatus, trainings]);
+
+  const toggleOculto = (id: string) => {
+    setHiddenTrainingIds((prev) => {
+      const next = prev.includes(id)
+        ? prev.filter((trainingId) => trainingId !== id)
+        : [...prev, id];
+
+      localStorage.setItem(hiddenStudentTrainingsKey, JSON.stringify(next));
+      return next;
+    });
   };
 
   return (
@@ -144,95 +103,215 @@ export const Treinamentos = () => {
       </div>
 
       <div className="flex gap-3 flex-wrap mb-8">
-        {/* filtros (mantidos iguais) */}
-        {["todos", "em_andamento", "concluido", "oculto"].map((status) => (
+        {(["todos", "em_andamento", "concluido", "oculto"] as StatusFilter[]).map((status) => (
           <button
             key={status}
-            onClick={() => setSelectedStatus(status as StatusFilter)}
+            onClick={() => setSelectedStatus(status)}
             className={`cursor-pointer px-6 py-2 rounded-full font-semibold transition-all ${
               selectedStatus === status
                 ? "bg-primary text-white"
                 : "bg-white text-primary border-2 border-primary hover:bg-primary-50"
             }`}
           >
-            {status.replace("_", " ")}
+            {status === "todos"
+              ? "Todos"
+              : status === "em_andamento"
+                ? "Em andamento"
+                : status === "concluido"
+                  ? "Concluidos"
+                  : "Ocultos"}
           </button>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {trainings.map((training) => {
-          const buttonStyle = getButtonStyle(training);
-          const progressColor = getProgressBarColor(training);
+      {errorMessage && (
+        <p className="mb-6 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
+          {errorMessage}
+        </p>
+      )}
 
-          return (
-            <Card
-              key={training.id}
-              onClick={() => handleClick(training.id)} // 👈 click no card
-              className="overflow-hidden shadow-md hover:shadow-lg transition-shadow rounded-md p-0 cursor-pointer"
-            >
-              <div className="w-full h-40 bg-linear-to-br from-primary-200 to-primary-400 relative flex items-start justify-end p-4">
-                {/* botão não propaga clique */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleOculto(training.id);
-                  }}
-                  className="bg-neutral-300 hover:bg-neutral-400 text-neutral-700 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 transition-colors"
-                >
-                  {training.status === "oculto" ? "Mostrar" : "Ocultar"}
-                </button>
-              </div>
+      {isLoading && (
+        <div className="text-center py-12 text-neutral-600">
+          Carregando treinamentos...
+        </div>
+      )}
 
-              <div className="p-5 flex flex-col gap-4">
-                <h3 className="font-bold text-neutral-900 text-lg">
-                  {training.title}
-                </h3>
+      {!isLoading && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredTrainings.map((training) => {
+            const isConcluded = isTrainingConcluded(training.endDate);
+            const isHidden = hiddenTrainingIds.includes(training.idTraining);
+            const progress = 0;
+            const statusConfig = getTrainingStatusConfig({
+              isConcluded,
+              progress,
+              hasPendingForms: false,
+              hasAvailableForms: false,
+            });
 
-                <div className="flex items-center gap-2 text-neutral-600">
-                  <Clock size={18} />
-                  <span className="font-medium">{training.hours} horas</span>
+            return (
+              <Card
+                key={training.idTraining}
+                onClick={() => navigate(`/painel/treinamentos/${training.idTraining}`)}
+                className="overflow-hidden shadow-md hover:shadow-lg transition-shadow rounded-md p-0 cursor-pointer"
+              >
+                <div className="w-full h-40 bg-primary-50 overflow-hidden relative flex items-start justify-end p-4">
+                  {training.trainingImage ? (
+                    <img
+                      src={training.trainingImage}
+                      alt={training.title}
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 h-full w-full bg-linear-to-br from-primary-100 to-primary-400" />
+                  )}
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleOculto(training.idTraining);
+                    }}
+                    className="relative bg-white/90 hover:bg-white text-neutral-700 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 transition-colors shadow"
+                  >
+                    {isHidden ? (
+                      <>
+                        <EyeOff size={14} /> Mostrar
+                      </>
+                    ) : (
+                      <>
+                        <Eye size={14} /> Ocultar
+                      </>
+                    )}
+                  </button>
                 </div>
 
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="font-semibold text-neutral-900">
-                      Progresso: {training.progress}%
+                <div className="p-5 flex flex-col gap-4">
+                  <div>
+                    <h3 className="font-bold text-neutral-900 text-lg">
+                      {training.title}
+                    </h3>
+                    <p className="mt-2 line-clamp-3 text-sm text-neutral-600">
+                      {training.description}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-neutral-600">
+                    <Clock size={18} />
+                    <span className="font-medium">{training.workload} horas</span>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="font-semibold text-neutral-900">
+                        Progresso: {progress}%
+                      </span>
+                      <span className="text-xs font-semibold text-neutral-500">
+                        Forms respondidos
+                      </span>
+                    </div>
+
+                    <div className="w-full bg-neutral-300 rounded-full h-2 overflow-hidden">
+                      <div
+                        className="h-full transition-all rounded-full"
+                        style={{
+                          width: `${progress}%`,
+                          backgroundColor: statusConfig.progressColor,
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2 text-sm text-neutral-600">
+                    <span className="flex items-center gap-2">
+                      <CalendarDays size={16} />
+                      <strong>Inicio:</strong> {training.initDate}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <CalendarDays size={16} />
+                      <strong>Termino:</strong> {training.endDate}
                     </span>
                   </div>
 
-                  <div className="w-full bg-neutral-300 rounded-full h-2 overflow-hidden">
-                    <div
-                      className="h-full transition-all rounded-full"
-                      style={{
-                        width: `${training.progress}%`,
-                        backgroundColor: progressColor,
-                      }}
-                    />
-                  </div>
+                  <Button
+                    className="w-full text-white font-semibold py-3 rounded-md"
+                    style={{ backgroundColor: statusConfig.buttonColor }}
+                    onPress={() => navigate(`/painel/treinamentos/${training.idTraining}`)}
+                  >
+                    {statusConfig.buttonText}
+                  </Button>
                 </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
-                <div className="flex gap-4 text-sm">
-                  <span className="text-neutral-600">
-                    <strong>Início:</strong> {training.startDate}
-                  </span>
-                  <span className="text-neutral-600">
-                    <strong>Término:</strong> {training.endDate}
-                  </span>
-                </div>
-
-                <Button
-                  className="w-full text-white font-semibold py-3 rounded-md"
-                  style={{ backgroundColor: buttonStyle?.bgColor }}
-                  onPress={() => handleClick(training.id)}
-                >
-                  {buttonStyle?.text}
-                </Button>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
+      {!isLoading && filteredTrainings.length === 0 && (
+        <div className="text-center py-12 text-neutral-600">
+          Nenhum treinamento encontrado.
+        </div>
+      )}
     </div>
   );
 };
+
+function isTrainingConcluded(endDate: string) {
+  if (!endDate) {
+    return false;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const trainingEndDate = new Date(`${endDate}T00:00:00`);
+
+  if (Number.isNaN(trainingEndDate.getTime())) {
+    return false;
+  }
+
+  return trainingEndDate < today;
+}
+
+type TrainingStatusConfigParams = {
+  isConcluded: boolean;
+  progress: number;
+  hasPendingForms: boolean;
+  hasAvailableForms: boolean;
+};
+
+function getTrainingStatusConfig({
+  isConcluded,
+  progress,
+  hasPendingForms,
+  hasAvailableForms,
+}: TrainingStatusConfigParams) {
+  if (hasAvailableForms) {
+    return {
+      buttonText: "Formulario disponivel",
+      buttonColor: "#17C964",
+      progressColor: "#006FEE",
+    };
+  }
+
+  if (hasPendingForms) {
+    return {
+      buttonText: "Pendente",
+      buttonColor: "#F5A623",
+      progressColor: "#F5A623",
+    };
+  }
+
+  if (isConcluded) {
+    return {
+      buttonText: progress >= 100 ? "Concluido" : "Concluido com pendencias",
+      buttonColor: progress >= 100 ? "#71717a" : "#F5A623",
+      progressColor: progress >= 100 ? "#17C964" : "#F5A623",
+    };
+  }
+
+  return {
+    buttonText: "Acessar treinamento",
+    buttonColor: "#006FEE",
+    progressColor: "#006FEE",
+  };
+}
