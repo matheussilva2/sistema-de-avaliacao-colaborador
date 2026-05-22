@@ -3,12 +3,25 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import type { TestType } from "../../Gerenciar-Treinamentos/Novo-Treinamento/types";
 import { getTrainingById, type ApiTraining } from "../../../services/trainingService";
+import { getAuthenticatedUser } from "../../../services/authService";
+import {
+  getFormUserAnswers,
+  getTrainingForms,
+  type ApiForm,
+  type ApiFormAnswer,
+  type ApiFormType,
+} from "../../../services/formService";
 
 type Tab = TestType | "satisfacao" | "resultado";
+
+type StudentFormSummary = ApiForm & {
+  answer?: ApiFormAnswer;
+};
 
 export default function TreinamentoAluno() {
   const { id } = useParams();
   const [training, setTraining] = useState<ApiTraining | null>(null);
+  const [forms, setForms] = useState<StudentFormSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [activeTab, setActiveTab] = useState<Tab>("pre-teste");
@@ -19,9 +32,37 @@ export default function TreinamentoAluno() {
         return;
       }
 
+      const currentUser = getAuthenticatedUser();
+
+      if (!currentUser) {
+        setErrorMessage("Usuario nao autenticado.");
+        setIsLoading(false);
+        return;
+      }
+
       try {
-        const trainingData = await getTrainingById(id);
+        const [trainingData, trainingForms] = await Promise.all([
+          getTrainingById(id),
+          getTrainingForms(id),
+        ]);
+
+        const formsWithAnswers = await Promise.all(
+          trainingForms.map(async (form) => {
+            try {
+              const answers = await getFormUserAnswers(form.idForm, currentUser.id);
+
+              return {
+                ...form,
+                answer: answers.at(-1),
+              };
+            } catch {
+              return form;
+            }
+          }),
+        );
+
         setTraining(trainingData);
+        setForms(formsWithAnswers);
       } catch {
         setErrorMessage("Nao foi possivel carregar esse treinamento.");
       } finally {
@@ -35,15 +76,20 @@ export default function TreinamentoAluno() {
   if (isLoading) return <div className="p-8 text-neutral-600">Carregando treinamento...</div>;
   if (!training) return <div className="p-8 text-red-700">{errorMessage || "Nenhum treinamento com esse id"}</div>;
 
+  const pendingForms = forms.filter((form) => !form.answer);
+  const preTestForms = pendingForms.filter((form) => form.formType === "PRE_TEST");
+  const postTestForms = pendingForms.filter((form) => form.formType === "POST_TEST");
+
   const renderTab = () => {
     switch (activeTab) {
       case "pre-teste":
+        return <FormsList forms={preTestForms} trainingId={training.idTraining} />;
       case "pos-teste":
-        return <FormsList />;
+        return <FormsList forms={postTestForms} trainingId={training.idTraining} />;
       case "satisfacao":
         return <Satisfacao />;
       case "resultado":
-        return <Resultados />;
+        return <Resultados forms={forms} trainingId={training.idTraining} />;
     }
   };
 
@@ -101,6 +147,7 @@ export default function TreinamentoAluno() {
         ].map((tab) => (
           <button
             key={tab.key}
+            type="button"
             onClick={() => setActiveTab(tab.key as Tab)}
             className={`pb-2 text-sm font-semibold transition whitespace-nowrap ${
               activeTab === tab.key
@@ -118,24 +165,72 @@ export default function TreinamentoAluno() {
   );
 }
 
-function FormsList() {
+function FormsList({
+  forms,
+  trainingId,
+}: {
+  forms: StudentFormSummary[];
+  trainingId: string;
+}) {
   const navigate = useNavigate();
-  const { id } = useParams();
 
   return (
-    <Card className="p-6 border border-dashed border-primary-200">
-      <p className="font-semibold text-primary">Nenhum formulario publicado</p>
-      <p className="mt-1 text-sm text-neutral-600">
-        Quando o gestor liberar um formulario para esta etapa, ele aparecera aqui.
-      </p>
-      <Button
-        className="mt-4 w-fit bg-primary text-white"
-        isDisabled
-        onPress={() => navigate(`/painel/treinamentos/${id}/execucao`)}
-      >
-        Responder formulario
-      </Button>
-    </Card>
+    <div className="grid gap-4">
+      {forms.map((form) => (
+        <Card key={form.idForm} className="p-6 border border-gray-200">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div>
+              <span className="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary">
+                {formTypeLabel(form.formType)}
+              </span>
+              <h3 className="mt-3 text-lg font-semibold text-neutral-900">
+                {form.title}
+              </h3>
+              <div className="mt-4 grid gap-3 text-sm text-neutral-600 md:grid-cols-3">
+                <div>
+                  <span>Inicio</span>
+                  <p className="font-semibold text-neutral-900">{form.initDate}</p>
+                </div>
+                <div>
+                  <span>Prazo final</span>
+                  <p className="font-semibold text-neutral-900">{form.endDate}</p>
+                </div>
+                <div>
+                  <span>Minimo</span>
+                  <p className="font-semibold text-neutral-900">
+                    {form.minCorrectPercentage}%
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-start gap-3 md:items-end">
+              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                Pendente
+              </span>
+
+              <Button
+                className="bg-primary text-white"
+                onPress={() =>
+                  navigate(`/painel/treinamentos/${trainingId}/formularios/${form.idForm}`)
+                }
+              >
+                Responder formulario
+              </Button>
+            </div>
+          </div>
+        </Card>
+      ))}
+
+      {forms.length === 0 && (
+        <Card className="p-6 border border-dashed border-primary-200">
+          <p className="font-semibold text-primary">Nenhum formulario publicado</p>
+          <p className="mt-1 text-sm text-neutral-600">
+            Quando o gestor liberar um formulario para esta etapa, ele aparecera aqui.
+          </p>
+        </Card>
+      )}
+    </div>
   );
 }
 
@@ -156,13 +251,69 @@ function Satisfacao() {
   );
 }
 
-function Resultados() {
+function Resultados({
+  forms,
+  trainingId,
+}: {
+  forms: StudentFormSummary[];
+  trainingId: string;
+}) {
+  const answeredForms = forms.filter((form) => form.answer);
+  const navigate = useNavigate();
+
   return (
-    <Card className="p-6 border border-dashed border-primary-200">
-      <p className="font-semibold text-primary">Nenhum resultado disponivel</p>
-      <p className="mt-1 text-sm text-neutral-600">
-        Os resultados aparecerao aqui depois que voce responder os formularios.
-      </p>
-    </Card>
+    <div className="grid gap-4">
+      {answeredForms.map((form) => (
+        <Card key={form.idForm} className="p-6 border border-gray-200">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <span className="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary">
+                {formTypeLabel(form.formType)}
+              </span>
+              <h3 className="mt-3 text-lg font-semibold text-neutral-900">
+                {form.title}
+              </h3>
+              <p className="mt-1 text-sm text-neutral-600">
+                Resultado: {form.answer?.correctAnswers}/{form.answer?.totalQuestions} acertos
+                ({form.answer?.scorePercentage}%)
+              </p>
+            </div>
+
+            <div className="flex flex-col items-start gap-3 md:items-end">
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                  form.answer?.approved
+                    ? "bg-green-50 text-green-700"
+                    : "bg-red-50 text-red-700"
+                }`}
+              >
+                {form.answer?.approved ? "Aprovado" : "Reprovado"}
+              </span>
+              <Button
+                className="bg-primary text-white"
+                onPress={() =>
+                  navigate(`/painel/treinamentos/${trainingId}/formularios/${form.idForm}`)
+                }
+              >
+                Ver formulario
+              </Button>
+            </div>
+          </div>
+        </Card>
+      ))}
+
+      {answeredForms.length === 0 && (
+        <Card className="p-6 border border-dashed border-primary-200">
+          <p className="font-semibold text-primary">Nenhum resultado disponivel</p>
+          <p className="mt-1 text-sm text-neutral-600">
+            Os resultados aparecerao aqui depois que voce responder os formularios.
+          </p>
+        </Card>
+      )}
+    </div>
   );
+}
+
+function formTypeLabel(type: ApiFormType) {
+  return type === "PRE_TEST" ? "Pre-teste" : "Pos-teste";
 }

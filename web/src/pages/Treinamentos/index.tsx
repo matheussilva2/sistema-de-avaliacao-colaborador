@@ -5,6 +5,11 @@ import { useNavigate } from "react-router-dom";
 import { getAuthenticatedUser } from "../../services/authService";
 import { getUserTrainings } from "../../services/userService";
 import type { ApiTraining } from "../../services/trainingService";
+import {
+  getTrainingForms,
+  getTrainingUserResults,
+  type ApiFormAnswer,
+} from "../../services/formService";
 
 type StatusFilter = "todos" | "em_andamento" | "concluido" | "oculto";
 const hiddenStudentTrainingsKey = "hiddenStudentTrainings";
@@ -13,6 +18,7 @@ export const Treinamentos = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<StatusFilter>("todos");
   const [trainings, setTrainings] = useState<ApiTraining[]>([]);
+  const [trainingProgress, setTrainingProgress] = useState<Record<string, TrainingProgress>>({});
   const [hiddenTrainingIds, setHiddenTrainingIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -40,6 +46,15 @@ export const Treinamentos = () => {
       try {
         const userTrainings = await getUserTrainings(user.id);
         setTrainings(userTrainings);
+
+        const progressEntries = await Promise.all(
+          userTrainings.map(async (training) => {
+            const progress = await loadTrainingProgress(training.idTraining, user.id);
+            return [training.idTraining, progress] as const;
+          }),
+        );
+
+        setTrainingProgress(Object.fromEntries(progressEntries));
       } catch {
         setErrorMessage("Nao foi possivel carregar seus treinamentos.");
       } finally {
@@ -141,12 +156,17 @@ export const Treinamentos = () => {
           {filteredTrainings.map((training) => {
             const isConcluded = isTrainingConcluded(training.endDate);
             const isHidden = hiddenTrainingIds.includes(training.idTraining);
-            const progress = 0;
+            const progressInfo = trainingProgress[training.idTraining] ?? {
+              totalForms: 0,
+              answeredForms: 0,
+              pendingForms: 0,
+              progress: 0,
+            };
             const statusConfig = getTrainingStatusConfig({
               isConcluded,
-              progress,
-              hasPendingForms: false,
-              hasAvailableForms: false,
+              progress: progressInfo.progress,
+              hasPendingForms: progressInfo.pendingForms > 0,
+              hasAvailableForms: progressInfo.pendingForms > 0,
             });
 
             return (
@@ -203,10 +223,10 @@ export const Treinamentos = () => {
                   <div>
                     <div className="flex justify-between items-center mb-2">
                       <span className="font-semibold text-neutral-900">
-                        Progresso: {progress}%
+                        Progresso: {progressInfo.progress}%
                       </span>
                       <span className="text-xs font-semibold text-neutral-500">
-                        Forms respondidos
+                        {progressInfo.answeredForms}/{progressInfo.totalForms} forms respondidos
                       </span>
                     </div>
 
@@ -214,7 +234,7 @@ export const Treinamentos = () => {
                       <div
                         className="h-full transition-all rounded-full"
                         style={{
-                          width: `${progress}%`,
+                          width: `${progressInfo.progress}%`,
                           backgroundColor: statusConfig.progressColor,
                         }}
                       />
@@ -270,6 +290,40 @@ function isTrainingConcluded(endDate: string) {
   }
 
   return trainingEndDate < today;
+}
+
+type TrainingProgress = {
+  totalForms: number;
+  answeredForms: number;
+  pendingForms: number;
+  progress: number;
+};
+
+async function loadTrainingProgress(
+  trainingId: string,
+  userId: string,
+): Promise<TrainingProgress> {
+  const forms = await getTrainingForms(trainingId);
+  let answers: ApiFormAnswer[] = [];
+
+  try {
+    answers = await getTrainingUserResults(trainingId, userId);
+  } catch {
+    answers = [];
+  }
+
+  const answeredFormIds = new Set(answers.map((answer) => answer.form.idForm));
+  const totalForms = forms.length;
+  const answeredForms = forms.filter((form) => answeredFormIds.has(form.idForm)).length;
+  const pendingForms = Math.max(totalForms - answeredForms, 0);
+  const progress = totalForms > 0 ? Math.round((answeredForms / totalForms) * 100) : 0;
+
+  return {
+    totalForms,
+    answeredForms,
+    pendingForms,
+    progress,
+  };
 }
 
 type TrainingStatusConfigParams = {

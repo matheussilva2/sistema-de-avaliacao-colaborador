@@ -12,10 +12,17 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { StudentTrainingAnalytics } from "../../mocks/trainingAnalytics";
 
 type Props = {
   students: StudentTrainingAnalytics[];
+};
+
+export type StudentTrainingAnalytics = {
+  nome: string;
+  quizResults: {
+    phase: QuizPhase;
+    score: number;
+  }[];
 };
 
 type QuizPhase = "pre" | "post";
