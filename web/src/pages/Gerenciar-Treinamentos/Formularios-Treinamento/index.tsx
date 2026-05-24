@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Card, Input } from "@heroui/react";
+import { Button, Card, Input, Skeleton } from "@heroui/react";
 import { Undo2, X } from "lucide-react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { TestFormSection } from "../Novo-Treinamento/components/TestFormSection";
@@ -366,7 +366,7 @@ export default function FormulariosTreinamento() {
   };
 
   if (isLoading) {
-    return <div className="p-8 text-neutral-600">Carregando formularios...</div>;
+    return <TrainingFormsSkeleton />;
   }
 
   return (
@@ -590,6 +590,65 @@ export default function FormulariosTreinamento() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function TrainingFormsSkeleton() {
+  return (
+    <div className="min-h-screen bg-neutral-50 p-8">
+      <div className="mx-auto flex max-w-5xl flex-col gap-6">
+        <Card className="p-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <Skeleton className="h-8 w-56 rounded-md" />
+              <Skeleton className="mt-2 h-5 w-72 rounded-md" />
+            </div>
+            <Skeleton className="h-10 w-40 rounded-md" />
+          </div>
+        </Card>
+
+        <Card className="p-6">
+          <div className="mb-5 flex flex-col gap-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <Skeleton className="h-4 w-40 rounded-md" />
+                <Skeleton className="mt-2 h-7 w-32 rounded-md" />
+              </div>
+              <Skeleton className="h-10 w-40 rounded-md" />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <Skeleton className="h-20 w-full rounded-md" />
+              <Skeleton className="h-20 w-full rounded-md" />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <Skeleton className="h-20 w-full rounded-md" />
+              <Skeleton className="h-20 w-full rounded-md" />
+              <Skeleton className="h-20 w-full rounded-md" />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            {[1, 2].map((question) => (
+              <div key={question} className="rounded-md border border-gray-200 p-4">
+                <Skeleton className="h-6 w-56 rounded-md" />
+                <div className="mt-4 grid gap-3">
+                  {[1, 2, 3].map((option) => (
+                    <Skeleton key={option} className="h-12 w-full rounded-md" />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <div className="flex justify-end gap-3">
+          <Skeleton className="h-10 w-24 rounded-md" />
+          <Skeleton className="h-10 w-40 rounded-md" />
+        </div>
+      </div>
     </div>
   );
 }

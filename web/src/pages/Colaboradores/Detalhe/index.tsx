@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Card, Input, Label, Button } from "@heroui/react";
+import { Card, Input, Label, Button, Skeleton } from "@heroui/react";
 import { Undo2, X } from "lucide-react";
 import {
   ApiRequestError,
@@ -144,7 +144,7 @@ export default function ColaboradorDetalhe() {
   };
 
   if (isLoading) {
-    return <div className="p-8 text-gray-500">Carregando usuario...</div>;
+    return <CollaboratorDetailSkeleton />;
   }
 
   if (!user) {
@@ -377,6 +377,53 @@ export default function ColaboradorDetalhe() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function CollaboratorDetailSkeleton() {
+  return (
+    <div className="p-8 bg-neutral-50 min-h-screen grid grid-cols-12 gap-6">
+      <div className="col-span-12 xl:col-span-4 flex flex-col gap-6">
+        <Card className="bg-primary-50 rounded-xl shadow-md p-6 flex flex-col items-center gap-4">
+          <Skeleton className="size-28 rounded-full" />
+          <div className="flex flex-col items-center gap-2">
+            <Skeleton className="h-6 w-48 rounded-md" />
+            <Skeleton className="h-5 w-28 rounded-md" />
+            <Skeleton className="h-8 w-24 rounded-full" />
+          </div>
+        </Card>
+
+        <Card className="rounded-xl shadow-md p-6 bg-white">
+          <Skeleton className="mb-4 h-5 w-36 rounded-md" />
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-4 w-full rounded-md" />
+            <Skeleton className="h-4 w-52 rounded-md" />
+            <Skeleton className="h-4 w-64 rounded-md" />
+          </div>
+        </Card>
+      </div>
+
+      <div className="col-span-12 xl:col-span-8 flex flex-col gap-6">
+        {[1, 2].map((card) => (
+          <Card key={card} className="rounded-xl shadow-md overflow-hidden p-0 gap-0">
+            <Skeleton className="h-14 w-full rounded-none" />
+            <div className="bg-primary-50 p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[1, 2, 3, 4].map((item) => (
+                <div key={item} className="flex flex-col gap-2">
+                  <Skeleton className="h-4 w-24 rounded-md" />
+                  <Skeleton className="h-10 w-full rounded-xl" />
+                </div>
+              ))}
+            </div>
+          </Card>
+        ))}
+
+        <div className="flex flex-col md:flex-row justify-end gap-3">
+          <Skeleton className="h-10 w-36 rounded-md" />
+          <Skeleton className="h-10 w-40 rounded-md" />
+        </div>
+      </div>
     </div>
   );
 }

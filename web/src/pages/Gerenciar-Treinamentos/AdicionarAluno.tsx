@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Button } from "@heroui/react";
+import { Button, Skeleton } from "@heroui/react";
 import { getAuthenticatedUser, type ApiUser } from "../../services/authService";
 import { getEmployeesByManager } from "../../services/userService";
 import {
@@ -114,7 +114,7 @@ export default function AdicionarAluno() {
   };
 
   if (isLoading) {
-    return <div className="p-8 text-neutral-600">Carregando colaboradores...</div>;
+    return <AddStudentsSkeleton />;
   }
 
   if (!training) {
@@ -268,6 +268,52 @@ export default function AdicionarAluno() {
               </div>
             )}
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AddStudentsSkeleton() {
+  return (
+    <div className="p-8 bg-neutral-50 min-h-screen">
+      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <Skeleton className="h-8 w-64 rounded-md" />
+          <Skeleton className="mt-2 h-4 w-96 max-w-full rounded-md" />
+        </div>
+        <Skeleton className="h-10 w-24 rounded-md" />
+      </div>
+
+      <div className="grid grid-cols-1 gap-6">
+        <div className="rounded-3xl bg-white shadow-sm border border-gray-200 p-6">
+          <div className="flex flex-col gap-4">
+            {[1, 2, 3, 4].map((item) => (
+              <div key={item} className="rounded-2xl border border-gray-200 p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4 w-full">
+                    <Skeleton className="h-14 w-14 rounded-full" />
+                    <div className="flex-1">
+                      <Skeleton className="h-5 w-48 rounded-md" />
+                      <Skeleton className="mt-2 h-4 w-56 rounded-md" />
+                    </div>
+                    <Skeleton className="h-7 w-24 rounded-full" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-3xl bg-white shadow-sm p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <Skeleton className="h-6 w-52 rounded-md" />
+              <Skeleton className="mt-2 h-4 w-40 rounded-md" />
+            </div>
+            <Skeleton className="h-10 w-32 rounded-md" />
+          </div>
+          <Skeleton className="mt-4 h-20 w-full rounded-2xl" />
         </div>
       </div>
     </div>

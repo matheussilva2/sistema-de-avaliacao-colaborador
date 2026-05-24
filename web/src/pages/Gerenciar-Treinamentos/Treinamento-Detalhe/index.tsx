@@ -1,4 +1,4 @@
-import { Card, Button, Input, Label } from "@heroui/react";
+import { Card, Button, Input, Label, Skeleton } from "@heroui/react";
 import { ChevronDown, ChevronUp, Trash2, Undo2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import TrainingAnalyticsCharts, {
@@ -179,7 +179,7 @@ export default function TreinamentoDetalhes() {
     }
   };
 
-  if (isLoading) return <div className="p-8 text-neutral-600">Carregando treinamento...</div>;
+  if (isLoading) return <ManagerTrainingDetailSkeleton />;
   if (!training) return <div className="p-8 text-red-700">{errorMessage || "Nenhum treinamento com esse id"}</div>;
 
   const preTestForms = trainingForms.filter((formItem) => formItem.formType === "PRE_TEST");
@@ -801,6 +801,80 @@ function FormListGroup({
         onDeleteForever={onDeleteForever}
         onEmptyTrash={onEmptyTrash}
       />
+    </div>
+  );
+}
+
+function ManagerTrainingDetailSkeleton() {
+  return (
+    <div className="p-8 bg-neutral-50 min-h-screen">
+      <Card className="overflow-hidden p-0 mb-6">
+        <Skeleton className="h-64 w-full rounded-none" />
+        <div className="p-6">
+          <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div className="flex-1">
+              <Skeleton className="h-8 w-72 rounded-md" />
+              <Skeleton className="mt-2 h-4 w-96 max-w-full rounded-md" />
+            </div>
+            <Skeleton className="h-10 w-32 rounded-md" />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 mb-4 md:grid-cols-3">
+            {[1, 2, 3].map((item) => (
+              <div key={item} className="bg-primary-50 p-4 rounded-md">
+                <Skeleton className="mb-2 h-4 w-24 rounded-md" />
+                <Skeleton className="h-7 w-28 rounded-md" />
+              </div>
+            ))}
+          </div>
+
+          <Skeleton className="mb-2 h-4 w-24 rounded-md" />
+          <Skeleton className="h-4 w-full rounded-md" />
+          <Skeleton className="mt-2 h-4 w-2/3 rounded-md" />
+        </div>
+      </Card>
+
+      <Card className="p-6 mb-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex-1">
+            <Skeleton className="h-6 w-72 rounded-md" />
+            <Skeleton className="mt-2 h-4 w-96 max-w-full rounded-md" />
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-10 w-40 rounded-md" />
+            <Skeleton className="h-10 w-44 rounded-md" />
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-3">
+          {[1, 2, 3].map((item) => (
+            <Skeleton key={item} className="h-20 w-full rounded-md" />
+          ))}
+        </div>
+      </Card>
+
+      <div className="grid grid-cols-2 gap-6">
+        <Card className="p-6 col-span-2">
+          <div className="mb-4 flex items-center justify-between">
+            <Skeleton className="h-6 w-40 rounded-md" />
+            <Skeleton className="h-4 w-20 rounded-md" />
+          </div>
+          <div className="mb-4 flex justify-end gap-2">
+            <Skeleton className="h-10 w-40 rounded-md" />
+            <Skeleton className="h-10 w-36 rounded-md" />
+          </div>
+          <div className="flex flex-col gap-3">
+            {[1, 2].map((item) => (
+              <Skeleton key={item} className="h-24 w-full rounded-md" />
+            ))}
+          </div>
+        </Card>
+
+        <Card className="p-6 col-span-2">
+          <Skeleton className="h-6 w-56 rounded-md" />
+          <Skeleton className="mt-4 h-64 w-full rounded-md" />
+        </Card>
+      </div>
     </div>
   );
 }

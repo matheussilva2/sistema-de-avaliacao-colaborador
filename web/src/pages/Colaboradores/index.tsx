@@ -1,4 +1,4 @@
-import { Button } from "@heroui/react";
+import { Button, Skeleton } from "@heroui/react";
 import { Search, Trash2, Undo2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -147,7 +147,9 @@ export default function Colaboradores() {
           </thead>
 
           <tbody>
-            {filtrados.map((user) => (
+            {isLoading && <CollaboratorsTableSkeletonRows />}
+
+            {!isLoading && filtrados.map((user) => (
               <tr
                 key={user.id}
                 className="border-t hover:bg-neutral-50 cursor-pointer"
@@ -194,12 +196,6 @@ export default function Colaboradores() {
           </tbody>
         </table>
 
-        {isLoading && (
-          <div className="p-6 text-center text-neutral-500">
-            Carregando usuarios...
-          </div>
-        )}
-
         {!isLoading && filtrados.length === 0 && (
           <div className="p-6 text-center text-neutral-500">
             Nenhum colaborador encontrado
@@ -242,6 +238,38 @@ export default function Colaboradores() {
         </div>
       )}
     </div>
+  );
+}
+
+function CollaboratorsTableSkeletonRows() {
+  return (
+    <>
+      {[1, 2, 3, 4, 5].map((item) => (
+        <tr key={item} className="border-t">
+          <td className="p-4">
+            <Skeleton className="size-11 rounded-full" />
+          </td>
+          <td className="p-4">
+            <Skeleton className="h-5 w-40 rounded-md" />
+          </td>
+          <td className="p-4">
+            <Skeleton className="h-5 w-44 rounded-md" />
+          </td>
+          <td className="p-4">
+            <Skeleton className="h-5 w-32 rounded-md" />
+          </td>
+          <td className="p-4">
+            <Skeleton className="h-5 w-24 rounded-md" />
+          </td>
+          <td className="p-4">
+            <Skeleton className="h-5 w-20 rounded-md" />
+          </td>
+          <td className="p-4">
+            <Skeleton className="h-9 w-20 rounded-md" />
+          </td>
+        </tr>
+      ))}
+    </>
   );
 }
 

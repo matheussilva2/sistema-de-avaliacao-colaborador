@@ -1,4 +1,4 @@
-import { Card } from "@heroui/react";
+import { Card, Skeleton } from "@heroui/react";
 import { CalendarDays } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -116,9 +116,7 @@ export default function Inicio() {
       )}
 
       {isLoading ? (
-        <div className="text-center py-12 text-neutral-600">
-          Carregando resumo...
-        </div>
+        <InicioSkeleton />
       ) : (
         <>
           <div className="grid gap-6 md:grid-cols-2">
@@ -152,6 +150,50 @@ export default function Inicio() {
         </>
       )}
     </div>
+  );
+}
+
+function InicioSkeleton() {
+  return (
+    <>
+      <div className="grid gap-6 md:grid-cols-2">
+        {[1, 2].map((item) => (
+          <Card key={item} className="overflow-hidden">
+            <Skeleton className="h-14 rounded-md" />
+            <div className="bg-primary-50 p-8">
+              <Skeleton className="mx-auto h-9 w-16 rounded-md" />
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      {[1, 2].map((section) => (
+        <Card key={section} className="overflow-hidden">
+          <Skeleton className="h-14 rounded-md" />
+
+          <div className="bg-primary-50 p-6 flex flex-col gap-4">
+            {[1, 2].map((item) => (
+              <div key={item} className="bg-white rounded-lg p-4 flex flex-col gap-3">
+                <div className="flex items-start justify-between gap-4">
+                  <Skeleton className="h-5 w-52 rounded-md" />
+                  <Skeleton className="h-8 w-28 rounded-full" />
+                </div>
+
+                <Skeleton className="h-4 w-36 rounded-md" />
+
+                <div>
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <Skeleton className="h-4 w-28 rounded-md" />
+                    <Skeleton className="h-4 w-36 rounded-md" />
+                  </div>
+                  <Skeleton className="h-2 w-full rounded-full" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      ))}
+    </>
   );
 }
 

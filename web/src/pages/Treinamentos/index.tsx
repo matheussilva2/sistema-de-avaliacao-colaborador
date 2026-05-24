@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button, Input, Card } from "@heroui/react";
+import { Button, Input, Card, Skeleton } from "@heroui/react";
 import { Clock, CalendarDays, Eye, EyeOff } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getAuthenticatedUser } from "../../services/authService";
@@ -178,9 +178,7 @@ export const Treinamentos = () => {
       )}
 
       {isLoading && (
-        <div className="text-center py-12 text-neutral-600">
-          Carregando treinamentos...
-        </div>
+        <TrainingGridSkeleton />
       )}
 
       {!isLoading && (
@@ -306,6 +304,46 @@ export const Treinamentos = () => {
     </div>
   );
 };
+
+function TrainingGridSkeleton() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {[1, 2, 3, 4, 5, 6].map((item) => (
+        <Card
+          key={item}
+          className="overflow-hidden shadow-md rounded-md p-0"
+        >
+          <Skeleton className="h-40 w-full rounded-none" />
+
+          <div className="p-5 flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-6 w-3/4 rounded-md" />
+              <Skeleton className="h-4 w-full rounded-md" />
+              <Skeleton className="h-4 w-2/3 rounded-md" />
+            </div>
+
+            <Skeleton className="h-5 w-28 rounded-md" />
+
+            <div>
+              <div className="mb-2 flex justify-between gap-4">
+                <Skeleton className="h-4 w-28 rounded-md" />
+                <Skeleton className="h-4 w-32 rounded-md" />
+              </div>
+              <Skeleton className="h-2 w-full rounded-full" />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-4 w-40 rounded-md" />
+              <Skeleton className="h-4 w-40 rounded-md" />
+            </div>
+
+            <Skeleton className="h-12 w-full rounded-md" />
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
 
 function isTrainingConcluded(endDate: string) {
   if (!endDate) {
