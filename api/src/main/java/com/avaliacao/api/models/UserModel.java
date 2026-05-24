@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 
+import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -27,6 +28,8 @@ public class UserModel {
     private String passWord;
     private String phone;
     private String cpf;
+    private LocalDate hireDate;
+    private LocalDate registrationDate;
 
     @Lob
     @Column(columnDefinition = "LONGTEXT")
@@ -99,6 +102,22 @@ public class UserModel {
 
     public void setCpf(String cpf) {
         this.cpf = cpf;
+    }
+
+    public LocalDate getHireDate() {
+        return hireDate;
+    }
+
+    public void setHireDate(LocalDate hireDate) {
+        this.hireDate = hireDate;
+    }
+
+    public LocalDate getRegistrationDate() {
+        return registrationDate;
+    }
+
+    public void setRegistrationDate(LocalDate registrationDate) {
+        this.registrationDate = registrationDate;
     }
 
     public String getProfilePhoto() {

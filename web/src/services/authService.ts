@@ -24,6 +24,8 @@ export type ApiUser = {
   email: string;
   phone: string;
   cpf: string;
+  hireDate?: string | null;
+  registrationDate?: string | null;
   profilePhoto?: string | null;
   userRole: ApiUserRole;
   active: boolean;
@@ -41,6 +43,8 @@ export type CreateUserPayload = {
   passWord: string;
   phone: string;
   cpf: string;
+  hireDate: string;
+  registrationDate: string;
   userRole: ApiUserRole;
   active: boolean;
 };

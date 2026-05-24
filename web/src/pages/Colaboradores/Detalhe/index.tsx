@@ -38,9 +38,13 @@ export default function ColaboradorDetalhe() {
     email: "",
     telefone: "",
     senha: "",
+    confirmarSenha: "",
+    dataContratacao: "",
+    dataRegistro: "",
     userRole: "EMPLOYEE" as ApiUserRole,
     situacao: "Ativo",
   });
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     async function loadUser() {
@@ -54,10 +58,13 @@ export default function ColaboradorDetalhe() {
         setForm({
           nome: userData.name,
           sobrenome: userData.lastName,
-          cpf: userData.cpf,
+          cpf: formatCpf(userData.cpf),
           email: userData.email,
           telefone: userData.phone,
           senha: "",
+          confirmarSenha: "",
+          dataContratacao: userData.hireDate ?? "",
+          dataRegistro: userData.registrationDate ?? "",
           userRole: userData.userRole,
           situacao: userData.active ? "Ativo" : "Inativo",
         });
@@ -84,7 +91,10 @@ export default function ColaboradorDetalhe() {
   }, [navigate, pendingUndo]);
 
   const handleFieldChange = (field: keyof typeof form, value: string) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    const nextValue = field === "cpf" ? formatCpf(value) : value;
+
+    setForm((prev) => ({ ...prev, [field]: nextValue }));
+    setFieldErrors((prev) => ({ ...prev, [field]: "" }));
   };
 
   const handleSave = async (event: FormEvent) => {
@@ -96,6 +106,14 @@ export default function ColaboradorDetalhe() {
 
     setIsSaving(true);
     setErrorMessage("");
+    const validationErrors = validateCollaboratorForm(form, false);
+
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors);
+      setErrorMessage("Corrija os campos destacados antes de salvar.");
+      setIsSaving(false);
+      return;
+    }
 
     try {
       const updatedUser = await updateUser(id, {
@@ -104,7 +122,9 @@ export default function ColaboradorDetalhe() {
         cpf: form.cpf,
         email: form.email,
         phone: form.telefone,
-        passWord: form.senha,
+        passWord: form.senha || undefined,
+        hireDate: form.dataContratacao,
+        registrationDate: form.dataRegistro,
         userRole: "EMPLOYEE",
         active: form.situacao === "Ativo",
       });
@@ -113,7 +133,9 @@ export default function ColaboradorDetalhe() {
       navigate("/painel/colaboradores");
     } catch (error) {
       if (error instanceof ApiRequestError && error.status === 409) {
-        setErrorMessage("Ja existe uma conta cadastrada com esse e-mail.");
+        const message = getUpdateConflictMessage(error.message);
+        setErrorMessage(message.global);
+        setFieldErrors((prev) => ({ ...prev, [message.field]: message.fieldMessage }));
       } else {
         setErrorMessage("Nao foi possivel salvar as alteracoes.");
       }
@@ -244,6 +266,7 @@ export default function ColaboradorDetalhe() {
                 onChange={(e) => handleFieldChange("cpf", e.target.value)}
                 required
               />
+              <FieldError message={fieldErrors.cpf} />
             </div>
 
             <div className="flex flex-col gap-2">
@@ -258,6 +281,7 @@ export default function ColaboradorDetalhe() {
                 onChange={(e) => handleFieldChange("email", e.target.value)}
                 required
               />
+              <FieldError message={fieldErrors.email} />
             </div>
 
             <div className="flex flex-col gap-2">
@@ -284,9 +308,55 @@ export default function ColaboradorDetalhe() {
                 className="bg-white"
                 value={form.senha}
                 onChange={(e) => handleFieldChange("senha", e.target.value)}
-                placeholder="Obrigatoria para salvar alteracoes"
+                placeholder="Opcional"
+              />
+              {form.senha && <PasswordRequirements password={form.senha} />}
+              <FieldError message={fieldErrors.senha} />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="profile_confirmar_senha_input" className="text-primary-700 font-semibold text-sm">
+                Confirmar nova senha
+              </Label>
+              <Input
+                id="profile_confirmar_senha_input"
+                type="password"
+                className="bg-white"
+                value={form.confirmarSenha}
+                onChange={(e) => handleFieldChange("confirmarSenha", e.target.value)}
+                placeholder="Repita apenas se alterar a senha"
+              />
+              <FieldError message={fieldErrors.confirmarSenha} />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="profile_data_contratacao_input" className="text-primary-700 font-semibold text-sm">
+                Data de contratação
+              </Label>
+              <Input
+                id="profile_data_contratacao_input"
+                type="date"
+                className="bg-white"
+                value={form.dataContratacao}
+                onChange={(e) => handleFieldChange("dataContratacao", e.target.value)}
                 required
               />
+              <FieldError message={fieldErrors.dataContratacao} />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="profile_data_registro_input" className="text-primary-700 font-semibold text-sm">
+                Data de registro
+              </Label>
+              <Input
+                id="profile_data_registro_input"
+                type="date"
+                className="bg-white"
+                value={form.dataRegistro}
+                onChange={(e) => handleFieldChange("dataRegistro", e.target.value)}
+                required
+              />
+              <FieldError message={fieldErrors.dataRegistro} />
             </div>
           </div>
         </Card>
@@ -329,7 +399,13 @@ export default function ColaboradorDetalhe() {
           </p>
         )}
 
-        <div className="flex flex-col md:flex-row justify-end gap-3">
+        <div className="flex flex-col items-end gap-2">
+          {errorMessage && (
+            <p className="text-sm font-semibold text-red-600">
+              {errorMessage}
+            </p>
+          )}
+          <div className="flex flex-col md:flex-row justify-end gap-3">
           <Button className="bg-red-500 text-white font-semibold px-8" onPress={handleDelete}>
             Deletar usuario
           </Button>
@@ -340,6 +416,7 @@ export default function ColaboradorDetalhe() {
           >
             {isSaving ? "Salvando..." : "Salvar alteracoes"}
           </Button>
+          </div>
         </div>
       </form>
 
@@ -379,6 +456,189 @@ export default function ColaboradorDetalhe() {
       )}
     </div>
   );
+}
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) {
+    return null;
+  }
+
+  return <p className="text-xs font-semibold text-red-600">{message}</p>;
+}
+
+function PasswordRequirements({ password }: { password: string }) {
+  const requirements = getPasswordRequirements(password);
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-3 text-xs">
+      <p className="mb-2 font-semibold text-neutral-700">Requisitos da senha</p>
+      <div className="grid gap-1">
+        {requirements.map((requirement) => (
+          <span
+            key={requirement.label}
+            className={requirement.valid ? "text-green-700" : "text-red-600"}
+          >
+            {requirement.valid ? "✓" : "x"} {requirement.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function validateCollaboratorForm(
+  form: {
+    cpf: string;
+    email: string;
+    senha: string;
+    confirmarSenha: string;
+    dataContratacao: string;
+    dataRegistro: string;
+  },
+  requirePassword: boolean,
+) {
+  const errors: Record<string, string> = {};
+
+  if (!isValidEmail(form.email)) {
+    errors.email = "Informe um e-mail valido.";
+  }
+
+  if (!isValidCpf(form.cpf)) {
+    errors.cpf = "Informe um CPF valido.";
+  }
+
+  if (!form.dataRegistro) {
+    errors.dataRegistro = "Informe a data de registro.";
+  }
+
+  if (!form.dataContratacao) {
+    errors.dataContratacao = "Informe a data de contratacao.";
+  } else {
+    const hireDateError = validateHireDate(form.dataContratacao, form.dataRegistro);
+
+    if (hireDateError) {
+      errors.dataContratacao = hireDateError;
+    }
+  }
+
+  if (requirePassword || form.senha || form.confirmarSenha) {
+    if (!isValidPassword(form.senha)) {
+      errors.senha = "A senha nao atende aos requisitos minimos.";
+    }
+
+    if (form.senha !== form.confirmarSenha) {
+      errors.confirmarSenha = "As senhas nao conferem.";
+    }
+  }
+
+  return errors;
+}
+
+function getPasswordRequirements(password: string) {
+  return [
+    { label: "Minimo de 8 caracteres", valid: password.length >= 8 },
+    { label: "Uma letra maiuscula", valid: /[A-Z]/.test(password) },
+    { label: "Uma letra minuscula", valid: /[a-z]/.test(password) },
+    { label: "Um numero", valid: /\d/.test(password) },
+  ];
+}
+
+function isValidPassword(password: string) {
+  return getPasswordRequirements(password).every((requirement) => requirement.valid);
+}
+
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function validateHireDate(hireDateValue: string, registrationDateValue: string) {
+  const hireDate = parseDate(hireDateValue);
+  const registrationDate = parseDate(registrationDateValue);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const thirtyYearsAgo = new Date(today);
+  thirtyYearsAgo.setFullYear(today.getFullYear() - 30);
+
+  if (!hireDate) {
+    return "Informe uma data de contratacao valida.";
+  }
+
+  if (registrationDate && hireDate < registrationDate) {
+    return "A data de contratacao nao pode ser anterior a data de registro.";
+  }
+
+  if (hireDate < thirtyYearsAgo) {
+    return "A data de contratacao nao pode ser inferior a 30 anos.";
+  }
+
+  if (hireDate > today) {
+    return "A data de contratacao nao pode ser superior ao dia de hoje.";
+  }
+
+  return "";
+}
+
+function parseDate(value: string) {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function isValidCpf(cpf: string) {
+  const digits = cpf.replace(/\D/g, "");
+
+  if (digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) {
+    return false;
+  }
+
+  const calculateDigit = (base: string, weight: number) => {
+    const sum = base
+      .split("")
+      .reduce((total, digit, index) => total + Number(digit) * (weight - index), 0);
+    const remainder = (sum * 10) % 11;
+    return remainder === 10 ? 0 : remainder;
+  };
+
+  const firstDigit = calculateDigit(digits.slice(0, 9), 10);
+  const secondDigit = calculateDigit(`${digits.slice(0, 9)}${firstDigit}`, 11);
+
+  return firstDigit === Number(digits[9]) && secondDigit === Number(digits[10]);
+}
+
+function formatCpf(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+
+  return digits
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+}
+
+function getUpdateConflictMessage(message: string) {
+  if (message.includes("Email already registered")) {
+    return {
+      field: "email",
+      fieldMessage: "Ja existe uma conta cadastrada com esse e-mail.",
+      global: "Ja existe uma conta cadastrada com esse e-mail.",
+    };
+  }
+
+  if (message.includes("Invalid CPF")) {
+    return {
+      field: "cpf",
+      fieldMessage: "Informe um CPF valido.",
+      global: "Corrija os campos destacados antes de salvar.",
+    };
+  }
+
+  return {
+    field: "email",
+    fieldMessage: "Nao foi possivel salvar esse campo.",
+    global: "Nao foi possivel salvar as alteracoes.",
+  };
 }
 
 function CollaboratorDetailSkeleton() {
