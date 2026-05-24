@@ -192,7 +192,15 @@ public class TrainingController {
             @PathVariable(value = "trainingId") UUID trainingId,
             @PathVariable(value = "userId") UUID userId){
 
-        Optional<TrainingModel> trainingO = trainingService.removeUser(trainingId,userId);
+        Optional<TrainingModel> trainingO;
+
+        try {
+            trainingO = trainingService.removeUser(trainingId,userId);
+        } catch (IllegalStateException exception) {
+            return ResponseEntity
+                    .status(HttpStatus.CONFLICT)
+                    .body(exception.getMessage());
+        }
 
         if(trainingO.isEmpty()){
             return ResponseEntity
