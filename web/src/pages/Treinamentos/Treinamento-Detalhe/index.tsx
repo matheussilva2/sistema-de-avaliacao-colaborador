@@ -13,6 +13,8 @@ import {
 } from "../../../services/formService";
 import { getTrashedFormIds } from "../../../services/formTrashService";
 
+const recentTrainingsKeyPrefix = "recentTrainings";
+
 type Tab = TestType | "satisfacao" | "resultado";
 
 type StudentFormSummary = ApiForm & {
@@ -66,6 +68,7 @@ export default function TreinamentoAluno() {
 
         setTraining(trainingData);
         setForms(formsWithAnswers);
+        registerRecentTrainingAccess(currentUser.id, trainingData.idTraining);
       } catch {
         setErrorMessage("Nao foi possivel carregar esse treinamento.");
       } finally {
@@ -319,4 +322,18 @@ function Resultados({
 
 function formTypeLabel(type: ApiFormType) {
   return type === "PRE_TEST" ? "Pre-teste" : "Pos-teste";
+}
+
+function registerRecentTrainingAccess(userId: string, trainingId: string) {
+  const storageKey = `${recentTrainingsKeyPrefix}:${userId}`;
+  const storedRecentTrainings = localStorage.getItem(storageKey);
+  const recentTrainingIds = storedRecentTrainings
+    ? (JSON.parse(storedRecentTrainings) as string[])
+    : [];
+  const nextRecentTrainingIds = [
+    trainingId,
+    ...recentTrainingIds.filter((item) => item !== trainingId),
+  ].slice(0, 3);
+
+  localStorage.setItem(storageKey, JSON.stringify(nextRecentTrainingIds));
 }

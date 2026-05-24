@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button, Input, Card } from "@heroui/react";
 import { Clock, CalendarDays, Eye, EyeOff } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { getAuthenticatedUser } from "../../services/authService";
 import { getUserTrainings } from "../../services/userService";
 import type { ApiTraining } from "../../services/trainingService";
@@ -29,8 +29,20 @@ export const Treinamentos = () => {
   const [hiddenTrainingIds, setHiddenTrainingIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const status = searchParams.get("status") as StatusFilter | null;
+
+    if (status && ["todos", "em_andamento", "concluido", "oculto"].includes(status)) {
+      setSelectedStatus(status);
+      return;
+    }
+
+    setSelectedStatus("todos");
+  }, [searchParams]);
 
   useEffect(() => {
     const storedHiddenTrainings = localStorage.getItem(hiddenStudentTrainingsKey);
@@ -138,7 +150,10 @@ export const Treinamentos = () => {
         {(["todos", "em_andamento", "concluido", "oculto"] as StatusFilter[]).map((status) => (
           <button
             key={status}
-            onClick={() => setSelectedStatus(status)}
+            onClick={() => {
+              setSelectedStatus(status);
+              setSearchParams(status === "todos" ? {} : { status });
+            }}
             className={`cursor-pointer px-6 py-2 rounded-full font-semibold transition-all ${
               selectedStatus === status
                 ? "bg-primary text-white"
