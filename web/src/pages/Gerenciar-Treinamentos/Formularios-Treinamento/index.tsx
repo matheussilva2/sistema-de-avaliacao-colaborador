@@ -456,7 +456,16 @@ export default function FormulariosTreinamento() {
         )}
 
         <div className="flex justify-end gap-3">
-          <Button className="bg-neutral-300 text-neutral-800" onPress={() => navigate(-1)}>
+          <Button
+            className="bg-neutral-300 text-neutral-800"
+            onPress={() =>
+              navigate(
+                trainingId
+                  ? `/painel/gerenciar-treinamentos/${trainingId}`
+                  : "/painel/gerenciar-treinamentos",
+              )
+            }
+          >
             Cancelar
           </Button>
           <Button

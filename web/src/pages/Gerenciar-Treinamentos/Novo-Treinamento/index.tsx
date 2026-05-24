@@ -142,7 +142,7 @@ export default function CriarTreinamento() {
         <div className="flex flex-wrap gap-3 mt-4 justify-end">
           <Button
             className="bg-neutral-300 text-neutral-800 w-32"
-            onPress={() => navigate(-1)}
+            onPress={() => navigate("/painel/gerenciar-treinamentos")}
           >
             Cancelar
           </Button>
