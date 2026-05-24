@@ -11,6 +11,7 @@ type TestFormSectionProps = {
   onOptionChange: (questionId: string, optionId: string, value: string) => void;
   onToggleCorrectOption: (questionId: string, optionId: string) => void;
   onRemoveOption: (questionId: string, optionId: string) => void;
+  isReadOnly?: boolean;
 };
 
 const testTypeLabel: Record<TestType, string> = {
@@ -28,6 +29,7 @@ export function TestFormSection({
   onOptionChange,
   onToggleCorrectOption,
   onRemoveOption,
+  isReadOnly = false,
 }: TestFormSectionProps) {
   return (
     <div className="flex flex-col gap-4">
@@ -43,11 +45,13 @@ export function TestFormSection({
                 placeholder={`Pergunta ${qIndex + 1}`}
                 value={q.title}
                 onChange={(e) => onQuestionTitleChange(q.id, e.target.value)}
+                readOnly={isReadOnly}
                 className="bg-neutral-50 flex-1 font-medium border-2 border-neutral-300 focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
               <Button
                 isIconOnly
                 onPress={() => onRemoveQuestion(q.id)}
+                isDisabled={isReadOnly}
                 aria-label="Remover pergunta"
                 className="!bg-transparent hover:!bg-danger/10 text-danger"
               >
@@ -64,6 +68,7 @@ export function TestFormSection({
                     placeholder={`Opção ${optIndex + 1}`}
                     value={opt.text}
                     onChange={(e) => onOptionChange(q.id, opt.id, e.target.value)}
+                    readOnly={isReadOnly}
                     className="bg-white flex-1 border-2 border-neutral-300 focus:border-primary focus:ring-2 focus:ring-primary/20"
                   />
 
@@ -72,6 +77,7 @@ export function TestFormSection({
                       type="checkbox"
                       checked={opt.isCorrect}
                       onChange={() => onToggleCorrectOption(q.id, opt.id)}
+                      disabled={isReadOnly}
                       className="h-4 w-4 rounded border-neutral-300 text-primary accent-primary"
                     />
                     Correta
@@ -79,7 +85,9 @@ export function TestFormSection({
 
                   {q.options.length > 1 && (
                     <button
+                      type="button"
                       onClick={() => onRemoveOption(q.id, opt.id)}
+                      disabled={isReadOnly}
                       className="text-neutral-400 hover:text-danger p-2 transition-colors text-xl font-light"
                     >
                       ×
@@ -92,7 +100,9 @@ export function TestFormSection({
             <div className="flex items-center gap-3 mt-1 ml-1">
               <div className="w-4 h-4 rounded-full border-2 border-neutral-300 flex-shrink-0 opacity-50" />
               <button
+                type="button"
                 onClick={() => onAddOption(q.id)}
+                disabled={isReadOnly}
                 className="text-sm text-neutral-500 hover:text-primary hover:underline"
               >
                 Adicionar opção
@@ -105,6 +115,7 @@ export function TestFormSection({
       <Button
         className="bg-primary/10 text-primary font-medium w-full py-6 mt-2 border border-primary/20 border-dashed"
         onPress={onAddQuestion}
+        isDisabled={isReadOnly}
       >
         + Adicionar Pergunta
       </Button>

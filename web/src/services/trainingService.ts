@@ -78,3 +78,41 @@ export function removeUserFromTraining(trainingId: string, userId: string) {
     method: "DELETE",
   });
 }
+
+export function sortTrainingsStable(trainings: ApiTraining[]) {
+  return [...trainings].sort((current, next) => {
+    const currentStart = Date.parse(`${current.initDate}T00:00:00`) || 0;
+    const nextStart = Date.parse(`${next.initDate}T00:00:00`) || 0;
+
+    if (currentStart !== nextStart) {
+      return nextStart - currentStart;
+    }
+
+    const titleCompare = current.title.localeCompare(next.title, "pt-BR");
+
+    if (titleCompare !== 0) {
+      return titleCompare;
+    }
+
+    return current.idTraining.localeCompare(next.idTraining);
+  });
+}
+
+export function readTrainingsCache(key: string) {
+  const cached = sessionStorage.getItem(key);
+
+  if (!cached) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(cached) as ApiTraining[];
+  } catch {
+    sessionStorage.removeItem(key);
+    return null;
+  }
+}
+
+export function writeTrainingsCache(key: string, trainings: ApiTraining[]) {
+  sessionStorage.setItem(key, JSON.stringify(trainings));
+}

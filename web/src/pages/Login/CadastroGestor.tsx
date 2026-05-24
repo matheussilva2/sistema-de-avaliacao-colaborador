@@ -41,6 +41,8 @@ export default function CadastroGestor() {
         phone: form.telefone,
         cpf: form.cpf,
         passWord: form.senha,
+        hireDate: getTodayDate(),
+        registrationDate: getTodayDate(),
         userRole: "MANAGER",
         active: true,
       });
@@ -211,4 +213,8 @@ export default function CadastroGestor() {
       </Card>
     </main>
   );
+}
+
+function getTodayDate() {
+  return new Date().toISOString().slice(0, 10);
 }

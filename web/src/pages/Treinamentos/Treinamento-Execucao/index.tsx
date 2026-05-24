@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Button, Card } from "@heroui/react";
+import { Button, Card, Skeleton } from "@heroui/react";
 import { getTrainingById, type ApiTraining } from "../../../services/trainingService";
 import { getAuthenticatedUser } from "../../../services/authService";
 import {
@@ -127,7 +127,7 @@ export default function TreinamentoExecucao() {
     }
   };
 
-  if (isLoading) return <div className="p-8 text-neutral-600">Carregando formulario...</div>;
+  if (isLoading) return <FormExecutionSkeleton />;
   if (!form) return <div className="p-8 text-red-700">{errorMessage || "Formulario nao encontrado."}</div>;
 
   return (
@@ -286,4 +286,56 @@ export default function TreinamentoExecucao() {
 
 function formTypeLabel(type: ApiFormType) {
   return type === "PRE_TEST" ? "Pre-teste" : "Pos-teste";
+}
+
+function FormExecutionSkeleton() {
+  return (
+    <div className="p-8 bg-neutral-50 min-h-screen">
+      <Card className="p-6 mb-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex-1">
+            <Skeleton className="h-6 w-24 rounded-full" />
+            <Skeleton className="mt-3 h-8 w-72 rounded-md" />
+            <Skeleton className="mt-2 h-5 w-48 rounded-md" />
+          </div>
+
+          <Skeleton className="h-24 w-full rounded-md md:w-40" />
+        </div>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-3">
+          {[1, 2, 3].map((item) => (
+            <div key={item} className="rounded-md bg-primary-50 p-4">
+              <Skeleton className="mb-2 h-4 w-24 rounded-md" />
+              <Skeleton className="h-6 w-28 rounded-md" />
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <div className="space-y-6">
+        {[1, 2, 3].map((question) => (
+          <Card key={question} className="p-6 border border-gray-200">
+            <Skeleton className="mb-4 h-5 w-2/3 rounded-md" />
+
+            <div className="grid gap-3">
+              {[1, 2, 3, 4].map((option) => (
+                <div
+                  key={option}
+                  className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-3"
+                >
+                  <Skeleton className="h-4 w-4 rounded-full" />
+                  <Skeleton className="h-4 w-64 max-w-full rounded-md" />
+                </div>
+              ))}
+            </div>
+          </Card>
+        ))}
+
+        <div className="flex justify-end gap-3">
+          <Skeleton className="h-10 w-24 rounded-md" />
+          <Skeleton className="h-10 w-40 rounded-md" />
+        </div>
+      </div>
+    </div>
+  );
 }

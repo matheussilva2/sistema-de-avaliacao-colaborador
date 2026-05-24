@@ -153,7 +153,7 @@ public class UserController {
 
         return ResponseEntity
                 .status(HttpStatus.OK)
-                .body("User deleted successfully");
+                .body("User deactivated successfully");
     }
 
     @GetMapping("/{id}/trainings")

@@ -3,6 +3,8 @@ import type { Cargo } from "../types/User";
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 const AUTH_USER_KEY = "authUser";
+const AUTH_LAST_ACTIVITY_KEY = "authLastActivity";
+export const SESSION_TIMEOUT_MS = 7 * 60 * 1000;
 
 export class ApiRequestError extends Error {
   status: number;
@@ -22,6 +24,8 @@ export type ApiUser = {
   email: string;
   phone: string;
   cpf: string;
+  hireDate?: string | null;
+  registrationDate?: string | null;
   profilePhoto?: string | null;
   userRole: ApiUserRole;
   active: boolean;
@@ -39,11 +43,15 @@ export type CreateUserPayload = {
   passWord: string;
   phone: string;
   cpf: string;
+  hireDate: string;
+  registrationDate: string;
   userRole: ApiUserRole;
   active: boolean;
 };
 
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  touchSession();
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: {
       "Content-Type": "application/json",
@@ -114,10 +122,16 @@ export function syncUserMockWithApiUser(user: ApiUser) {
 
 export function saveAuthenticatedUser(user: ApiUser) {
   localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+  markSessionActivity();
   syncUserMockWithApiUser(user);
 }
 
 export function getAuthenticatedUser() {
+  if (isSessionExpired()) {
+    clearAuthenticatedUser();
+    return null;
+  }
+
   const storedUser = localStorage.getItem(AUTH_USER_KEY);
 
   if (!storedUser) {
@@ -134,6 +148,8 @@ export function getAuthenticatedUser() {
 
 export function clearAuthenticatedUser() {
   localStorage.removeItem(AUTH_USER_KEY);
+  localStorage.removeItem(AUTH_LAST_ACTIVITY_KEY);
+  sessionStorage.clear();
 }
 
 export function login(payload: LoginPayload) {
@@ -148,4 +164,41 @@ export function createUser(payload: CreateUserPayload) {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export function touchSession() {
+  if (!localStorage.getItem(AUTH_USER_KEY)) {
+    return;
+  }
+
+  if (!localStorage.getItem(AUTH_LAST_ACTIVITY_KEY)) {
+    markSessionActivity();
+    return;
+  }
+
+  if (isSessionExpired()) {
+    clearAuthenticatedUser();
+    return;
+  }
+
+  markSessionActivity();
+}
+
+export function isSessionExpired() {
+  const storedUser = localStorage.getItem(AUTH_USER_KEY);
+  const lastActivity = localStorage.getItem(AUTH_LAST_ACTIVITY_KEY);
+
+  if (!storedUser) {
+    return false;
+  }
+
+  if (!lastActivity) {
+    return true;
+  }
+
+  return Date.now() - Number(lastActivity) > SESSION_TIMEOUT_MS;
+}
+
+function markSessionActivity() {
+  localStorage.setItem(AUTH_LAST_ACTIVITY_KEY, String(Date.now()));
 }

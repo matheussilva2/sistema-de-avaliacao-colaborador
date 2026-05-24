@@ -1,18 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button, Input, Card } from "@heroui/react";
+import { Button, Input, Card, Skeleton } from "@heroui/react";
 import { Clock, CalendarDays, Eye, EyeOff } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { getAuthenticatedUser } from "../../services/authService";
 import { getUserTrainings } from "../../services/userService";
 import type { ApiTraining } from "../../services/trainingService";
+import {
+  readTrainingsCache,
+  sortTrainingsStable,
+  writeTrainingsCache,
+} from "../../services/trainingService";
 import {
   getTrainingForms,
   getTrainingUserResults,
   type ApiFormAnswer,
 } from "../../services/formService";
+import { getTrashedFormIds } from "../../services/formTrashService";
 
 type StatusFilter = "todos" | "em_andamento" | "concluido" | "oculto";
 const hiddenStudentTrainingsKey = "hiddenStudentTrainings";
+const studentTrainingsCachePrefix = "studentTrainings";
 
 export const Treinamentos = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -22,8 +29,20 @@ export const Treinamentos = () => {
   const [hiddenTrainingIds, setHiddenTrainingIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const status = searchParams.get("status") as StatusFilter | null;
+
+    if (status && ["todos", "em_andamento", "concluido", "oculto"].includes(status)) {
+      setSelectedStatus(status);
+      return;
+    }
+
+    setSelectedStatus("todos");
+  }, [searchParams]);
 
   useEffect(() => {
     const storedHiddenTrainings = localStorage.getItem(hiddenStudentTrainingsKey);
@@ -43,12 +62,22 @@ export const Treinamentos = () => {
         return;
       }
 
+      const cacheKey = `${studentTrainingsCachePrefix}:${user.id}`;
+      const cachedTrainings = readTrainingsCache(cacheKey);
+
+      if (cachedTrainings) {
+        setTrainings(sortTrainingsStable(cachedTrainings));
+        setIsLoading(false);
+      }
+
       try {
         const userTrainings = await getUserTrainings(user.id);
-        setTrainings(userTrainings);
+        const sortedTrainings = sortTrainingsStable(userTrainings);
+        setTrainings(sortedTrainings);
+        writeTrainingsCache(cacheKey, sortedTrainings);
 
         const progressEntries = await Promise.all(
-          userTrainings.map(async (training) => {
+          sortedTrainings.map(async (training) => {
             const progress = await loadTrainingProgress(training.idTraining, user.id);
             return [training.idTraining, progress] as const;
           }),
@@ -121,7 +150,10 @@ export const Treinamentos = () => {
         {(["todos", "em_andamento", "concluido", "oculto"] as StatusFilter[]).map((status) => (
           <button
             key={status}
-            onClick={() => setSelectedStatus(status)}
+            onClick={() => {
+              setSelectedStatus(status);
+              setSearchParams(status === "todos" ? {} : { status });
+            }}
             className={`cursor-pointer px-6 py-2 rounded-full font-semibold transition-all ${
               selectedStatus === status
                 ? "bg-primary text-white"
@@ -146,9 +178,7 @@ export const Treinamentos = () => {
       )}
 
       {isLoading && (
-        <div className="text-center py-12 text-neutral-600">
-          Carregando treinamentos...
-        </div>
+        <TrainingGridSkeleton />
       )}
 
       {!isLoading && (
@@ -275,6 +305,46 @@ export const Treinamentos = () => {
   );
 };
 
+function TrainingGridSkeleton() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {[1, 2, 3, 4, 5, 6].map((item) => (
+        <Card
+          key={item}
+          className="overflow-hidden shadow-md rounded-md p-0"
+        >
+          <Skeleton className="h-40 w-full rounded-none" />
+
+          <div className="p-5 flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-6 w-3/4 rounded-md" />
+              <Skeleton className="h-4 w-full rounded-md" />
+              <Skeleton className="h-4 w-2/3 rounded-md" />
+            </div>
+
+            <Skeleton className="h-5 w-28 rounded-md" />
+
+            <div>
+              <div className="mb-2 flex justify-between gap-4">
+                <Skeleton className="h-4 w-28 rounded-md" />
+                <Skeleton className="h-4 w-32 rounded-md" />
+              </div>
+              <Skeleton className="h-2 w-full rounded-full" />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-4 w-40 rounded-md" />
+              <Skeleton className="h-4 w-40 rounded-md" />
+            </div>
+
+            <Skeleton className="h-12 w-full rounded-md" />
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
 function isTrainingConcluded(endDate: string) {
   if (!endDate) {
     return false;
@@ -303,7 +373,10 @@ async function loadTrainingProgress(
   trainingId: string,
   userId: string,
 ): Promise<TrainingProgress> {
-  const forms = await getTrainingForms(trainingId);
+  const trashedFormIds = getTrashedFormIds(trainingId);
+  const forms = (await getTrainingForms(trainingId)).filter(
+    (form) => !trashedFormIds.has(form.idForm),
+  );
   let answers: ApiFormAnswer[] = [];
 
   try {

@@ -1,4 +1,4 @@
-import { Card, Button } from "@heroui/react";
+import { Card, Button, Skeleton } from "@heroui/react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import type { TestType } from "../../Gerenciar-Treinamentos/Novo-Treinamento/types";
@@ -11,6 +11,9 @@ import {
   type ApiFormAnswer,
   type ApiFormType,
 } from "../../../services/formService";
+import { getTrashedFormIds } from "../../../services/formTrashService";
+
+const recentTrainingsKeyPrefix = "recentTrainings";
 
 type Tab = TestType | "satisfacao" | "resultado";
 
@@ -46,8 +49,10 @@ export default function TreinamentoAluno() {
           getTrainingForms(id),
         ]);
 
+        const trashedFormIds = getTrashedFormIds(id);
+        const activeForms = trainingForms.filter((form) => !trashedFormIds.has(form.idForm));
         const formsWithAnswers = await Promise.all(
-          trainingForms.map(async (form) => {
+          activeForms.map(async (form) => {
             try {
               const answers = await getFormUserAnswers(form.idForm, currentUser.id);
 
@@ -63,6 +68,7 @@ export default function TreinamentoAluno() {
 
         setTraining(trainingData);
         setForms(formsWithAnswers);
+        registerRecentTrainingAccess(currentUser.id, trainingData.idTraining);
       } catch {
         setErrorMessage("Nao foi possivel carregar esse treinamento.");
       } finally {
@@ -73,7 +79,7 @@ export default function TreinamentoAluno() {
     loadTraining();
   }, [id]);
 
-  if (isLoading) return <div className="p-8 text-neutral-600">Carregando treinamento...</div>;
+  if (isLoading) return <TrainingDetailSkeleton />;
   if (!training) return <div className="p-8 text-red-700">{errorMessage || "Nenhum treinamento com esse id"}</div>;
 
   const pendingForms = forms.filter((form) => !form.answer);
@@ -316,4 +322,78 @@ function Resultados({
 
 function formTypeLabel(type: ApiFormType) {
   return type === "PRE_TEST" ? "Pre-teste" : "Pos-teste";
+}
+
+function TrainingDetailSkeleton() {
+  return (
+    <div className="p-8 bg-neutral-50 min-h-screen">
+      <Card className="overflow-hidden p-0 mb-6">
+        <Skeleton className="h-64 w-full rounded-none" />
+
+        <div className="p-6">
+          <Skeleton className="mb-4 h-8 w-72 rounded-md" />
+
+          <div className="grid gap-4 mb-4 md:grid-cols-3">
+            {[1, 2, 3].map((item) => (
+              <div key={item} className="bg-primary-50 p-4 rounded-md">
+                <Skeleton className="mb-2 h-4 w-24 rounded-md" />
+                <Skeleton className="h-6 w-28 rounded-md" />
+              </div>
+            ))}
+          </div>
+
+          <Skeleton className="mb-2 h-4 w-full rounded-md" />
+          <Skeleton className="h-4 w-2/3 rounded-md" />
+        </div>
+      </Card>
+
+      <Card className="p-6 mb-6">
+        <Skeleton className="mb-4 h-6 w-56 rounded-md" />
+        <Skeleton className="h-4 w-96 max-w-full rounded-md" />
+      </Card>
+
+      <div className="mb-6 flex gap-6 overflow-x-auto border-b border-gray-200">
+        {[1, 2, 3, 4].map((item) => (
+          <Skeleton key={item} className="mb-2 h-6 w-24 rounded-md" />
+        ))}
+      </div>
+
+      <div className="grid gap-4">
+        {[1, 2].map((item) => (
+          <Card key={item} className="p-6 border border-gray-200">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div className="flex-1">
+                <Skeleton className="h-6 w-24 rounded-full" />
+                <Skeleton className="mt-3 h-6 w-64 rounded-md" />
+                <div className="mt-4 grid gap-3 md:grid-cols-3">
+                  <Skeleton className="h-12 w-full rounded-md" />
+                  <Skeleton className="h-12 w-full rounded-md" />
+                  <Skeleton className="h-12 w-full rounded-md" />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 md:items-end">
+                <Skeleton className="h-6 w-24 rounded-full" />
+                <Skeleton className="h-10 w-40 rounded-md" />
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function registerRecentTrainingAccess(userId: string, trainingId: string) {
+  const storageKey = `${recentTrainingsKeyPrefix}:${userId}`;
+  const storedRecentTrainings = localStorage.getItem(storageKey);
+  const recentTrainingIds = storedRecentTrainings
+    ? (JSON.parse(storedRecentTrainings) as string[])
+    : [];
+  const nextRecentTrainingIds = [
+    trainingId,
+    ...recentTrainingIds.filter((item) => item !== trainingId),
+  ].slice(0, 3);
+
+  localStorage.setItem(storageKey, JSON.stringify(nextRecentTrainingIds));
 }

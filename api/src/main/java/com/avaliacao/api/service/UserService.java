@@ -13,6 +13,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -29,6 +30,10 @@ public class UserService {
     }
 
     public UserModel create(UserRecordDTO userRecordDTO){
+        validateCpf(userRecordDTO.cpf());
+        validateDates(userRecordDTO.hireDate(), userRecordDTO.registrationDate());
+        validatePassword(userRecordDTO.passWord());
+
         var userWithSameEmail = userRepository.findByEmail(userRecordDTO.email());
 
         if(userWithSameEmail.isPresent()){
@@ -47,6 +52,10 @@ public class UserService {
     }
 
     public UserModel createForManager(UUID managerId, UserRecordDTO userRecordDTO){
+        validateCpf(userRecordDTO.cpf());
+        validateDates(userRecordDTO.hireDate(), userRecordDTO.registrationDate());
+        validatePassword(userRecordDTO.passWord());
+
         var userWithSameEmail = userRepository.findByEmail(userRecordDTO.email());
 
         if(userWithSameEmail.isPresent()){
@@ -72,7 +81,7 @@ public class UserService {
 
     public List<UserModel> findEmployeesByManager(UUID managerId){
         getManagerOrThrow(managerId);
-        return userRepository.findByManager_IdAndUserRole(managerId, UserRole.EMPLOYEE);
+        return userRepository.findByManager_IdAndUserRoleAndActiveTrue(managerId, UserRole.EMPLOYEE);
     }
 
     public Optional<UserModel> findById(UUID id){
@@ -87,6 +96,11 @@ public class UserService {
         }
 
         var user = userO.get();
+
+        if(!user.isActive()){
+            return Optional.empty();
+        }
+
         boolean passwordMatches = passwordEncoder.matches(
                 loginRecordDTO.passWord(),
                 user.getPassWord()
@@ -108,8 +122,11 @@ public class UserService {
 
         var user = userO.get();
 
-        if(user.getUserRole() == UserRole.EMPLOYEE && !user.getEmail().equals(userRecordDTO.email())){
-            throw new IllegalArgumentException("Employee email cannot be changed.");
+        validateCpf(userRecordDTO.cpf());
+        validateDates(userRecordDTO.hireDate(), userRecordDTO.registrationDate());
+
+        if(userRecordDTO.passWord() != null && !userRecordDTO.passWord().isBlank()){
+            validatePassword(userRecordDTO.passWord());
         }
 
         var userWithSameEmail = userRepository.findByEmail(userRecordDTO.email());
@@ -158,7 +175,9 @@ public class UserService {
             return false;
         }
 
-        userRepository.delete(userO.get());
+        var user = userO.get();
+        user.setActive(false);
+        userRepository.save(user);
         return true;
 
     }
@@ -190,5 +209,59 @@ public class UserService {
         }
 
         user.setManager(getManagerOrThrow(managerId));
+    }
+
+    private void validateDates(LocalDate hireDate, LocalDate registrationDate){
+        var today = LocalDate.now();
+        var thirtyYearsAgo = today.minusYears(30);
+
+        if(hireDate.isBefore(registrationDate)){
+            throw new IllegalArgumentException("Hire date cannot be before registration date.");
+        }
+
+        if(hireDate.isBefore(thirtyYearsAgo)){
+            throw new IllegalArgumentException("Hire date cannot be more than 30 years ago.");
+        }
+
+        if(hireDate.isAfter(today)){
+            throw new IllegalArgumentException("Hire date cannot be after today.");
+        }
+    }
+
+    private void validatePassword(String password){
+        if(password == null ||
+                password.length() < 8 ||
+                !password.matches(".*[A-Z].*") ||
+                !password.matches(".*[a-z].*") ||
+                !password.matches(".*\\d.*")){
+            throw new IllegalArgumentException("Password does not meet requirements.");
+        }
+    }
+
+    private void validateCpf(String cpf){
+        var digits = cpf == null ? "" : cpf.replaceAll("\\D", "");
+
+        if(digits.length() != 11 || digits.matches("(\\d)\\1{10}")){
+            throw new IllegalArgumentException("Invalid CPF.");
+        }
+
+        int firstDigit = calculateCpfDigit(digits.substring(0,9), 10);
+        int secondDigit = calculateCpfDigit(digits.substring(0,9) + firstDigit, 11);
+
+        if(firstDigit != Character.getNumericValue(digits.charAt(9)) ||
+                secondDigit != Character.getNumericValue(digits.charAt(10))){
+            throw new IllegalArgumentException("Invalid CPF.");
+        }
+    }
+
+    private int calculateCpfDigit(String digits, int weight){
+        int sum = 0;
+
+        for(int index = 0; index < digits.length(); index++){
+            sum += Character.getNumericValue(digits.charAt(index)) * (weight - index);
+        }
+
+        int remainder = (sum * 10) % 11;
+        return remainder == 10 ? 0 : remainder;
     }
 }

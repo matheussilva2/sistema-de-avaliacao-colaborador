@@ -5,6 +5,7 @@ import com.avaliacao.api.dtos.TrainingRecordDTO;
 import com.avaliacao.api.enums.UserRole;
 import com.avaliacao.api.models.TrainingModel;
 import com.avaliacao.api.models.UserModel;
+import com.avaliacao.api.repositories.FormAnswerRepository;
 import com.avaliacao.api.repositories.TrainingRepository;
 import com.avaliacao.api.repositories.UserRepository;
 import jakarta.transaction.Transactional;
@@ -21,10 +22,14 @@ public class TrainingService {
 
     private final TrainingRepository trainingRepository;
     private final UserRepository userRepository;
+    private final FormAnswerRepository formAnswerRepository;
 
-    public TrainingService(TrainingRepository trainingRepository, UserRepository userRepository){
+    public TrainingService(TrainingRepository trainingRepository,
+                           UserRepository userRepository,
+                           FormAnswerRepository formAnswerRepository){
         this.trainingRepository = trainingRepository;
         this.userRepository = userRepository;
+        this.formAnswerRepository = formAnswerRepository;
     }
 
     public TrainingModel create(TrainingRecordDTO trainingRecordDTO){
@@ -123,6 +128,11 @@ public class TrainingService {
         }
 
         var training = trainingO.get();
+
+        if(formAnswerRepository.existsByFormTrainingIdTrainingAndUserId(trainingId,userId)){
+            throw new IllegalStateException("Colaborador ja iniciou o treinamento.");
+        }
+
         training.getUsers().remove(userO.get());
 
         return Optional.of(trainingRepository.save(training));

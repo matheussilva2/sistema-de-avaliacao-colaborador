@@ -1,16 +1,20 @@
-import { Button, Input, Card } from "@heroui/react";
+import { Button, Input, Card, Skeleton } from "@heroui/react";
 import { Eye, EyeOff, Clock, CalendarDays } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { getAuthenticatedUser } from "../../services/authService";
 import {
   getTrainingsByManager,
+  readTrainingsCache,
+  sortTrainingsStable,
   type ApiTraining,
+  writeTrainingsCache,
 } from "../../services/trainingService";
 
 type StatusFilter = "todos" | "em_andamento" | "concluido" | "oculto";
 
 const hiddenTrainingsKey = "hiddenTrainings";
+const managerTrainingsCachePrefix = "managerTrainings";
 
 export const GerenciarTreinamentos = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -40,9 +44,19 @@ export const GerenciarTreinamentos = () => {
         return;
       }
 
+      const cacheKey = `${managerTrainingsCachePrefix}:${manager.id}`;
+      const cachedTrainings = readTrainingsCache(cacheKey);
+
+      if (cachedTrainings) {
+        setTrainings(sortTrainingsStable(cachedTrainings));
+        setIsLoading(false);
+      }
+
       try {
         const managerTrainings = await getTrainingsByManager(manager.id);
-        setTrainings(managerTrainings);
+        const sortedTrainings = sortTrainingsStable(managerTrainings);
+        setTrainings(sortedTrainings);
+        writeTrainingsCache(cacheKey, sortedTrainings);
       } catch {
         setErrorMessage("Nao foi possivel carregar os treinamentos deste gestor.");
       } finally {
@@ -140,9 +154,7 @@ export const GerenciarTreinamentos = () => {
       )}
 
       {isLoading && (
-        <div className="text-center py-12">
-          <p className="text-neutral-600">Carregando treinamentos...</p>
-        </div>
+        <ManagerTrainingsSkeleton />
       )}
 
       {!isLoading && (
@@ -241,6 +253,34 @@ export const GerenciarTreinamentos = () => {
     </div>
   );
 };
+
+function ManagerTrainingsSkeleton() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {[1, 2, 3, 4, 5, 6].map((item) => (
+        <Card key={item} className="overflow-hidden shadow-md rounded-md p-0">
+          <Skeleton className="h-44 w-full rounded-none" />
+
+          <div className="p-5 flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-6 w-3/4 rounded-md" />
+              <Skeleton className="h-4 w-full rounded-md" />
+              <Skeleton className="h-4 w-2/3 rounded-md" />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-5 w-32 rounded-md" />
+              <Skeleton className="h-4 w-40 rounded-md" />
+              <Skeleton className="h-4 w-40 rounded-md" />
+            </div>
+
+            <Skeleton className="h-12 w-full rounded-md" />
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
 
 function isTrainingConcluded(endDate: string) {
   if (!endDate) {

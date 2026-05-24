@@ -13,6 +13,8 @@ export type UserFormPayload = {
   passWord?: string;
   phone: string;
   cpf: string;
+  hireDate: string;
+  registrationDate: string;
   userRole: ApiUserRole;
   active: boolean;
 };
