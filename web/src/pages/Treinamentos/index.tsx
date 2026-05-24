@@ -6,13 +6,20 @@ import { getAuthenticatedUser } from "../../services/authService";
 import { getUserTrainings } from "../../services/userService";
 import type { ApiTraining } from "../../services/trainingService";
 import {
+  readTrainingsCache,
+  sortTrainingsStable,
+  writeTrainingsCache,
+} from "../../services/trainingService";
+import {
   getTrainingForms,
   getTrainingUserResults,
   type ApiFormAnswer,
 } from "../../services/formService";
+import { getTrashedFormIds } from "../../services/formTrashService";
 
 type StatusFilter = "todos" | "em_andamento" | "concluido" | "oculto";
 const hiddenStudentTrainingsKey = "hiddenStudentTrainings";
+const studentTrainingsCachePrefix = "studentTrainings";
 
 export const Treinamentos = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -43,12 +50,22 @@ export const Treinamentos = () => {
         return;
       }
 
+      const cacheKey = `${studentTrainingsCachePrefix}:${user.id}`;
+      const cachedTrainings = readTrainingsCache(cacheKey);
+
+      if (cachedTrainings) {
+        setTrainings(sortTrainingsStable(cachedTrainings));
+        setIsLoading(false);
+      }
+
       try {
         const userTrainings = await getUserTrainings(user.id);
-        setTrainings(userTrainings);
+        const sortedTrainings = sortTrainingsStable(userTrainings);
+        setTrainings(sortedTrainings);
+        writeTrainingsCache(cacheKey, sortedTrainings);
 
         const progressEntries = await Promise.all(
-          userTrainings.map(async (training) => {
+          sortedTrainings.map(async (training) => {
             const progress = await loadTrainingProgress(training.idTraining, user.id);
             return [training.idTraining, progress] as const;
           }),
@@ -303,7 +320,10 @@ async function loadTrainingProgress(
   trainingId: string,
   userId: string,
 ): Promise<TrainingProgress> {
-  const forms = await getTrainingForms(trainingId);
+  const trashedFormIds = getTrashedFormIds(trainingId);
+  const forms = (await getTrainingForms(trainingId)).filter(
+    (form) => !trashedFormIds.has(form.idForm),
+  );
   let answers: ApiFormAnswer[] = [];
 
   try {

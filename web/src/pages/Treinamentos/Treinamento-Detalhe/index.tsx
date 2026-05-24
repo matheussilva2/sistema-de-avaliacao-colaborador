@@ -11,6 +11,7 @@ import {
   type ApiFormAnswer,
   type ApiFormType,
 } from "../../../services/formService";
+import { getTrashedFormIds } from "../../../services/formTrashService";
 
 type Tab = TestType | "satisfacao" | "resultado";
 
@@ -46,8 +47,10 @@ export default function TreinamentoAluno() {
           getTrainingForms(id),
         ]);
 
+        const trashedFormIds = getTrashedFormIds(id);
+        const activeForms = trainingForms.filter((form) => !trashedFormIds.has(form.idForm));
         const formsWithAnswers = await Promise.all(
-          trainingForms.map(async (form) => {
+          activeForms.map(async (form) => {
             try {
               const answers = await getFormUserAnswers(form.idForm, currentUser.id);
 

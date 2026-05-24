@@ -16,7 +16,9 @@ import { userMock } from "../../mock";
 import {
   clearAuthenticatedUser,
   getAuthenticatedUser,
+  isSessionExpired,
   syncUserMockWithApiUser,
+  touchSession,
 } from "../../services/authService";
 import { getUserById } from "../../services/userService";
 import { getTrainingById } from "../../services/trainingService";
@@ -41,8 +43,36 @@ export default function Tamplate() {
 
     if (authenticatedUser) {
       syncUserMockWithApiUser(authenticatedUser);
+    } else {
+      navigate("/");
     }
-  }, []);
+  }, [navigate]);
+
+  useEffect(() => {
+    const activityEvents = ["click", "keydown", "mousemove", "scroll", "touchstart"];
+
+    const handleActivity = () => {
+      touchSession();
+    };
+
+    const sessionCheck = window.setInterval(() => {
+      if (isSessionExpired()) {
+        clearAuthenticatedUser();
+        navigate("/");
+      }
+    }, 30_000);
+
+    activityEvents.forEach((eventName) => {
+      window.addEventListener(eventName, handleActivity, { passive: true });
+    });
+
+    return () => {
+      window.clearInterval(sessionCheck);
+      activityEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, handleActivity);
+      });
+    };
+  }, [navigate]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -302,6 +332,10 @@ async function buildCollaboratorsBreadcrumbs(
 
   if (detailOrAction === "adicionar" || detailOrAction === "novo") {
     return [...list, { label: "Adicionar Colaborador", path: pathname }];
+  }
+
+  if (detailOrAction === "lixeira") {
+    return [...list, { label: "Lixeira", path: pathname }];
   }
 
   const userName = await getUserName(detailOrAction);

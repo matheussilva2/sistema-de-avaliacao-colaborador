@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button, Card, Input } from "@heroui/react";
+import { Undo2, X } from "lucide-react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { TestFormSection } from "../Novo-Treinamento/components/TestFormSection";
 import type { Question, TestType } from "../Novo-Treinamento/types";
@@ -7,15 +8,19 @@ import {
   createFormQuestion,
   createQuestionAlternative,
   createTrainingForm,
-  deleteTrainingForm,
   getFormQuestions,
   getQuestionAlternatives,
+  getTrainingResults,
   getTrainingForms,
   updateTrainingForm,
   type ApiForm,
   type ApiFormType,
 } from "../../../services/formService";
 import { getTrainingById, type ApiTraining } from "../../../services/trainingService";
+import {
+  moveFormToTrash,
+  restoreFormFromTrash,
+} from "../../../services/formTrashService";
 
 type ManagedTrainingForm = {
   id: string;
@@ -61,6 +66,10 @@ type LocationState = {
   };
 };
 
+type PendingUndo = {
+  form: ApiForm;
+};
+
 export default function FormulariosTreinamento() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -75,6 +84,8 @@ export default function FormulariosTreinamento() {
   const [forms, setForms] = useState<ManagedTrainingForm[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLockedByAnswers, setIsLockedByAnswers] = useState(false);
+  const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
@@ -103,6 +114,15 @@ export default function FormulariosTreinamento() {
           : null;
 
         setForms([selectedForm ?? createEmptyForm(trainingId, defaultType)]);
+
+        if (selectedForm?.persistedId) {
+          const trainingResults = await getTrainingResults(trainingId).catch(() => []);
+          setIsLockedByAnswers(
+            trainingResults.some((answer) => answer.form.idForm === selectedForm.persistedId),
+          );
+        } else {
+          setIsLockedByAnswers(false);
+        }
       } catch {
         setErrorMessage("Nao foi possivel carregar os formularios deste treinamento.");
         setForms([createEmptyForm(trainingId || crypto.randomUUID(), defaultType)]);
@@ -114,6 +134,18 @@ export default function FormulariosTreinamento() {
     loadForms();
   }, [defaultType, selectedFormId, trainingId]);
 
+  useEffect(() => {
+    if (!pendingUndo) {
+      return;
+    }
+
+    const undoTimer = window.setTimeout(() => {
+      navigate(`/painel/gerenciar-treinamentos/${trainingId}`);
+    }, 5000);
+
+    return () => window.clearTimeout(undoTimer);
+  }, [navigate, pendingUndo, trainingId]);
+
   const title = training?.title ?? state?.trainingDraft?.title ?? "Novo treinamento";
 
   const updateForm = (
@@ -121,6 +153,10 @@ export default function FormulariosTreinamento() {
     field: keyof Omit<ManagedTrainingForm, "id" | "trainingId" | "questions">,
     value: string,
   ) => {
+    if (isLockedByAnswers) {
+      return;
+    }
+
     setForms((prev) =>
       prev.map((form) => (form.id === formId ? { ...form, [field]: value } : form)),
     );
@@ -129,26 +165,53 @@ export default function FormulariosTreinamento() {
   const removeForm = async (formId: string) => {
     const form = forms.find((item) => item.id === formId);
 
-    if (form?.persistedId) {
-      try {
-        await deleteTrainingForm(form.persistedId);
-      } catch {
-        setErrorMessage("Nao foi possivel remover o formulario.");
+    if (!form?.persistedId || !trainingId) {
+      return;
+    }
+
+    try {
+      const trainingResults = await getTrainingResults(trainingId).catch(() => []);
+      const hasAnswers = trainingResults.some(
+        (answer) => answer.form.idForm === form.persistedId,
+      );
+
+      if (hasAnswers) {
+        setErrorMessage("Formulario ja tem respostas cadastradas.");
+        setSuccessMessage("");
         return;
       }
+    } catch {
+      setErrorMessage("Nao foi possivel verificar respostas cadastradas.");
+      setSuccessMessage("");
+      return;
     }
 
+    const apiForm = mapManagedFormToApiForm(form);
+    moveFormToTrash(trainingId, apiForm);
     setForms((prev) => prev.filter((form) => form.id !== formId));
+    setPendingUndo({ form: apiForm });
+    setSuccessMessage("");
+    setErrorMessage("");
+  };
 
-    if (trainingId) {
-      navigate(`/painel/gerenciar-treinamentos/${trainingId}`);
+  const handleUndoDelete = () => {
+    if (!pendingUndo || !trainingId) {
+      return;
     }
+
+    restoreFormFromTrash(trainingId, pendingUndo.form.idForm);
+    setForms([mapApiFormToManagedForm(trainingId, pendingUndo.form)]);
+    setPendingUndo(null);
   };
 
   const updateQuestions = (
     formId: string,
     updater: (questions: Question[]) => Question[],
   ) => {
+    if (isLockedByAnswers) {
+      return;
+    }
+
     setForms((prev) =>
       prev.map((form) =>
         form.id === formId ? { ...form, questions: updater(form.questions) } : form,
@@ -241,6 +304,12 @@ export default function FormulariosTreinamento() {
   };
 
   const handleSave = async () => {
+    if (isLockedByAnswers) {
+      setErrorMessage("Formulario ja tem respostas cadastradas e nao pode ser editado.");
+      setSuccessMessage("");
+      return;
+    }
+
     if (!trainingId) {
       setErrorMessage("Salve o treinamento antes de criar formularios.");
       return;
@@ -340,7 +409,7 @@ export default function FormulariosTreinamento() {
                   <Button
                     className="bg-red-50 text-red-700"
                     onPress={() => removeForm(form.id)}
-                    isDisabled={isSaving}
+                    isDisabled={isSaving || isLockedByAnswers}
                   >
                     Remover formulario
                   </Button>
@@ -355,6 +424,7 @@ export default function FormulariosTreinamento() {
                   <Input
                     value={form.title}
                     onChange={(event) => updateForm(form.id, "title", event.target.value)}
+                    readOnly={isLockedByAnswers}
                   />
                 </div>
 
@@ -367,6 +437,7 @@ export default function FormulariosTreinamento() {
                     onChange={(event) =>
                       updateForm(form.id, "type", event.target.value as TestType)
                     }
+                    disabled={isLockedByAnswers}
                     className="rounded-md border-2 border-neutral-300 bg-white p-3 text-sm outline-none focus:border-primary"
                   >
                     <option value="pre-teste">Pre-teste</option>
@@ -386,6 +457,7 @@ export default function FormulariosTreinamento() {
                     onChange={(event) =>
                       updateForm(form.id, "startDeadline", event.target.value)
                     }
+                    readOnly={isLockedByAnswers}
                   />
                 </div>
                 <div className="flex flex-col gap-2">
@@ -398,6 +470,7 @@ export default function FormulariosTreinamento() {
                     onChange={(event) =>
                       updateForm(form.id, "endDeadline", event.target.value)
                     }
+                    readOnly={isLockedByAnswers}
                   />
                 </div>
                 <div className="flex flex-col gap-2">
@@ -409,6 +482,7 @@ export default function FormulariosTreinamento() {
                     onChange={(event) =>
                       updateForm(form.id, "minCorrect", event.target.value)
                     }
+                    disabled={isLockedByAnswers}
                     className="rounded-md border-2 border-neutral-300 bg-white p-3 text-sm outline-none focus:border-primary"
                   >
                     <option value="50">50% de acertos</option>
@@ -439,7 +513,14 @@ export default function FormulariosTreinamento() {
               onRemoveOption={(qId, optId) =>
                 handleRemoveOption(form.id, qId, optId)
               }
+              isReadOnly={isLockedByAnswers}
             />
+
+            {isLockedByAnswers && (
+              <p className="mt-4 rounded-md bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
+                Formulario ja tem respostas cadastradas e nao pode ser editado.
+              </p>
+            )}
           </Card>
         ))}
 
@@ -471,12 +552,44 @@ export default function FormulariosTreinamento() {
           <Button
             className="bg-primary text-white px-8"
             onPress={handleSave}
-            isDisabled={isSaving}
+            isDisabled={isSaving || isLockedByAnswers}
           >
             {isSaving ? "Salvando..." : "Salvar formularios"}
           </Button>
         </div>
       </div>
+
+      {pendingUndo && (
+        <div className="fixed bottom-6 right-6 z-50 w-[min(420px,calc(100vw-3rem))] rounded-md border border-gray-200 bg-white p-4 shadow-xl">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="font-semibold text-neutral-900">
+                Formulario movido para a lixeira
+              </p>
+              <p className="mt-1 text-sm text-neutral-600">
+                {pendingUndo.form.title} sera mantido na lixeira ate a exclusao
+                definitiva.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setPendingUndo(null)}
+              className="rounded-md p-1 text-neutral-500 transition hover:bg-gray-100 hover:text-neutral-900"
+              aria-label="Fechar aviso"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="mt-4 flex justify-end">
+            <Button className="bg-primary text-white" onPress={handleUndoDelete}>
+              <Undo2 size={16} />
+              Desfazer
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -517,5 +630,30 @@ async function hydrateForm(trainingId: string, form: ApiForm): Promise<ManagedTr
     endDeadline: form.endDate,
     minCorrect: String(form.minCorrectPercentage),
     questions: hydratedQuestions,
+  };
+}
+
+function mapManagedFormToApiForm(form: ManagedTrainingForm): ApiForm {
+  return {
+    idForm: form.persistedId ?? form.id,
+    title: form.title,
+    formType: mapTestTypeToApi(form.type),
+    initDate: form.startDeadline,
+    endDate: form.endDeadline,
+    minCorrectPercentage: Number(form.minCorrect),
+  };
+}
+
+function mapApiFormToManagedForm(trainingId: string, form: ApiForm): ManagedTrainingForm {
+  return {
+    id: form.idForm,
+    persistedId: form.idForm,
+    trainingId,
+    title: form.title,
+    type: mapApiFormType(form.formType),
+    startDeadline: form.initDate,
+    endDeadline: form.endDate,
+    minCorrect: String(form.minCorrectPercentage),
+    questions: [],
   };
 }

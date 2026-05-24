@@ -72,7 +72,7 @@ public class UserService {
 
     public List<UserModel> findEmployeesByManager(UUID managerId){
         getManagerOrThrow(managerId);
-        return userRepository.findByManager_IdAndUserRole(managerId, UserRole.EMPLOYEE);
+        return userRepository.findByManager_IdAndUserRoleAndActiveTrue(managerId, UserRole.EMPLOYEE);
     }
 
     public Optional<UserModel> findById(UUID id){
@@ -87,6 +87,11 @@ public class UserService {
         }
 
         var user = userO.get();
+
+        if(!user.isActive()){
+            return Optional.empty();
+        }
+
         boolean passwordMatches = passwordEncoder.matches(
                 loginRecordDTO.passWord(),
                 user.getPassWord()
@@ -158,7 +163,9 @@ public class UserService {
             return false;
         }
 
-        userRepository.delete(userO.get());
+        var user = userO.get();
+        user.setActive(false);
+        userRepository.save(user);
         return true;
 
     }

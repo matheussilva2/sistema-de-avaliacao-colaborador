@@ -5,12 +5,16 @@ import { useEffect, useMemo, useState } from "react";
 import { getAuthenticatedUser } from "../../services/authService";
 import {
   getTrainingsByManager,
+  readTrainingsCache,
+  sortTrainingsStable,
   type ApiTraining,
+  writeTrainingsCache,
 } from "../../services/trainingService";
 
 type StatusFilter = "todos" | "em_andamento" | "concluido" | "oculto";
 
 const hiddenTrainingsKey = "hiddenTrainings";
+const managerTrainingsCachePrefix = "managerTrainings";
 
 export const GerenciarTreinamentos = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -40,9 +44,19 @@ export const GerenciarTreinamentos = () => {
         return;
       }
 
+      const cacheKey = `${managerTrainingsCachePrefix}:${manager.id}`;
+      const cachedTrainings = readTrainingsCache(cacheKey);
+
+      if (cachedTrainings) {
+        setTrainings(sortTrainingsStable(cachedTrainings));
+        setIsLoading(false);
+      }
+
       try {
         const managerTrainings = await getTrainingsByManager(manager.id);
-        setTrainings(managerTrainings);
+        const sortedTrainings = sortTrainingsStable(managerTrainings);
+        setTrainings(sortedTrainings);
+        writeTrainingsCache(cacheKey, sortedTrainings);
       } catch {
         setErrorMessage("Nao foi possivel carregar os treinamentos deste gestor.");
       } finally {

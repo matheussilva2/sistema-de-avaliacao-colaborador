@@ -1,17 +1,26 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Card, Input, Label, Button } from "@heroui/react";
-import { UserCircle2 } from "lucide-react";
+import { Undo2, X } from "lucide-react";
 import {
   ApiRequestError,
+  getAuthenticatedUser,
   type ApiUser,
   type ApiUserRole,
 } from "../../../services/authService";
 import {
-  deleteUser,
   getUserById,
   updateUser,
 } from "../../../services/userService";
+import {
+  moveEmployeeToTrash,
+  restoreEmployeeFromTrash,
+} from "../../../services/employeeTrashService";
+
+type PendingUndo = {
+  managerId: string;
+  user: ApiUser;
+};
 
 export default function ColaboradorDetalhe() {
   const { id } = useParams();
@@ -20,6 +29,7 @@ export default function ColaboradorDetalhe() {
   const [user, setUser] = useState<ApiUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [form, setForm] = useState({
     nome: "",
@@ -61,6 +71,18 @@ export default function ColaboradorDetalhe() {
     loadUser();
   }, [id]);
 
+  useEffect(() => {
+    if (!pendingUndo) {
+      return;
+    }
+
+    const undoTimer = window.setTimeout(() => {
+      navigate("/painel/colaboradores");
+    }, 5000);
+
+    return () => window.clearTimeout(undoTimer);
+  }, [navigate, pendingUndo]);
+
   const handleFieldChange = (field: keyof typeof form, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
@@ -100,17 +122,25 @@ export default function ColaboradorDetalhe() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!id) {
+  const handleDelete = () => {
+    const manager = getAuthenticatedUser();
+
+    if (!user || !manager || manager.userRole !== "MANAGER") {
+      setErrorMessage("Nao foi possivel mover o colaborador para a lixeira.");
       return;
     }
 
-    try {
-      await deleteUser(id);
-      navigate("/painel/colaboradores");
-    } catch {
-      setErrorMessage("Nao foi possivel deletar o usuario.");
+    moveEmployeeToTrash(manager.id, user);
+    setPendingUndo({ managerId: manager.id, user });
+  };
+
+  const handleUndoDelete = () => {
+    if (!pendingUndo) {
+      return;
     }
+
+    restoreEmployeeFromTrash(pendingUndo.managerId, pendingUndo.user.id);
+    setPendingUndo(null);
   };
 
   if (isLoading) {
@@ -129,7 +159,17 @@ export default function ColaboradorDetalhe() {
     <div className="p-8 bg-neutral-50 min-h-screen grid grid-cols-12 gap-6">
       <div className="col-span-12 xl:col-span-4 flex flex-col gap-6">
         <Card className="bg-primary-50 rounded-xl shadow-md p-6 flex flex-col items-center gap-4">
-          <UserCircle2 className="text-primary-400 size-20" />
+          {user.profilePhoto ? (
+            <img
+              src={user.profilePhoto}
+              alt={`${form.nome} ${form.sobrenome}`}
+              className="size-28 rounded-full border-4 border-primary object-cover"
+            />
+          ) : (
+            <div className="flex size-28 items-center justify-center rounded-full border-4 border-primary bg-white text-3xl font-bold text-primary">
+              {getUserInitials(form.nome, form.sobrenome)}
+            </div>
+          )}
 
           <div className="text-center flex flex-col gap-2">
             <span className="text-primary-700 text-lg font-bold">
@@ -302,6 +342,47 @@ export default function ColaboradorDetalhe() {
           </Button>
         </div>
       </form>
+
+      {pendingUndo && (
+        <div className="fixed bottom-6 right-6 z-50 w-[min(420px,calc(100vw-3rem))] rounded-md border border-gray-200 bg-white p-4 shadow-xl">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="font-semibold text-neutral-900">
+                Colaborador movido para a lixeira
+              </p>
+              <p className="mt-1 text-sm text-neutral-600">
+                {pendingUndo.user.name} {pendingUndo.user.lastName} sera mantido na
+                lixeira ate a exclusao definitiva.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setPendingUndo(null)}
+              className="rounded-md p-1 text-neutral-500 transition hover:bg-gray-100 hover:text-neutral-900"
+              aria-label="Fechar aviso"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="mt-4 flex justify-end">
+            <Button
+              className="bg-primary text-white"
+              onPress={handleUndoDelete}
+            >
+              <Undo2 size={16} />
+              Desfazer
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+function getUserInitials(name: string, lastName: string) {
+  const initials = `${name.trim().charAt(0)}${lastName.trim().charAt(0)}`.toUpperCase();
+
+  return initials || "C";
 }

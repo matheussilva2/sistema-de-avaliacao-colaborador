@@ -1,5 +1,5 @@
 import { Card, Button, Input, Label } from "@heroui/react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Trash2, Undo2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import TrainingAnalyticsCharts, {
   type StudentTrainingAnalytics,
@@ -14,6 +14,7 @@ import {
 } from "../../../services/trainingService";
 import type { ApiUser } from "../../../services/authService";
 import {
+  deleteTrainingForm,
   getFormQuestions,
   getTrainingResults,
   getTrainingForms,
@@ -21,6 +22,14 @@ import {
   type ApiForm,
   type ApiFormType,
 } from "../../../services/formService";
+import {
+  clearFormTrash,
+  getTrashedFormIds,
+  getTrashedForms,
+  removeFormFromTrash,
+  restoreFormFromTrash,
+  type TrashedForm,
+} from "../../../services/formTrashService";
 
 type TrainingFormSummary = ApiForm & {
   questionCount: number;
@@ -41,6 +50,7 @@ export default function TreinamentoDetalhes() {
   const [training, setTraining] = useState<ApiTraining | null>(null);
   const [linkedUsers, setLinkedUsers] = useState<ApiUser[]>([]);
   const [trainingForms, setTrainingForms] = useState<TrainingFormSummary[]>([]);
+  const [trashedForms, setTrashedForms] = useState<TrashedForm[]>([]);
   const [trainingResults, setTrainingResults] = useState<ApiFormAnswer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -80,10 +90,14 @@ export default function TreinamentoDetalhes() {
             };
           }),
         );
+        const trashedFormIds = getTrashedFormIds(id);
 
         setTraining(trainingData);
         setLinkedUsers(trainingUsers);
-        setTrainingForms(formsWithQuestionCount);
+        setTrainingForms(
+          formsWithQuestionCount.filter((formItem) => !trashedFormIds.has(formItem.idForm)),
+        );
+        setTrashedForms(getTrashedForms(id));
         setTrainingResults(apiResults);
         setForm({
           title: trainingData.title,
@@ -172,6 +186,59 @@ export default function TreinamentoDetalhes() {
   const postTestForms = trainingForms.filter((formItem) => formItem.formType === "POST_TEST");
   const studentStats = buildStudentStats(linkedUsers, trainingForms, trainingResults);
   const analyticsStudents = buildAnalyticsStudents(linkedUsers, studentStats);
+
+  const handleRestoreForm = (formId: string) => {
+    const restoredForm = trashedForms.find((item) => item.form.idForm === formId)?.form;
+    const nextTrash = restoreFormFromTrash(training.idTraining, formId);
+
+    setTrashedForms(nextTrash);
+
+    if (restoredForm) {
+      setTrainingForms((current) =>
+        [...current, { ...restoredForm, questionCount: 0 }].sort(compareFormsByTitle),
+      );
+    }
+  };
+
+  const handleDeleteFormForever = async (formId: string) => {
+    const hasAnswers = trainingResults.some((answer) => answer.form.idForm === formId);
+
+    if (hasAnswers) {
+      setErrorMessage("Formulario ja tem respostas cadastradas.");
+      setSuccessMessage("");
+      return;
+    }
+
+    try {
+      await deleteTrainingForm(formId);
+      setTrashedForms(removeFormFromTrash(training.idTraining, formId));
+    } catch {
+      setErrorMessage("Nao foi possivel excluir definitivamente o formulario.");
+      setSuccessMessage("");
+    }
+  };
+
+  const handleEmptyFormsTrash = async () => {
+    const formsWithAnswers = new Set(trainingResults.map((answer) => answer.form.idForm));
+    const blockedForms = trashedForms.filter((item) =>
+      formsWithAnswers.has(item.form.idForm),
+    );
+
+    if (blockedForms.length > 0) {
+      setErrorMessage("Formulario ja tem respostas cadastradas.");
+      setSuccessMessage("");
+      return;
+    }
+
+    try {
+      await Promise.all(trashedForms.map((item) => deleteTrainingForm(item.form.idForm)));
+      clearFormTrash(training.idTraining);
+      setTrashedForms([]);
+    } catch {
+      setErrorMessage("Nao foi possivel esvaziar toda a lixeira de formularios.");
+      setSuccessMessage("");
+    }
+  };
 
   return (
     <div className="p-8 bg-neutral-50 min-h-screen">
@@ -405,6 +472,10 @@ export default function TreinamentoDetalhes() {
                   `/painel/gerenciar-treinamentos/${training.idTraining}/formularios?formId=${formId}`,
                 )
               }
+              trashedForms={trashedForms}
+              onRestore={handleRestoreForm}
+              onDeleteForever={handleDeleteFormForever}
+              onEmptyTrash={handleEmptyFormsTrash}
             />
           </div>
         )}
@@ -445,6 +516,10 @@ export default function TreinamentoDetalhes() {
                   key={user.id}
                   user={user}
                   stats={studentStats[user.id] ?? createEmptyStudentStats(trainingForms.length)}
+                  onInactiveStudent={() => {
+                    setErrorMessage("Colaborador inativo.");
+                    setSuccessMessage("");
+                  }}
                 />
               ))}
               {linkedUsers.length === 0 && (
@@ -480,37 +555,110 @@ export default function TreinamentoDetalhes() {
 function LinkedStudentCard({
   user,
   stats,
+  onInactiveStudent,
 }: {
   user: ApiUser;
   stats: StudentStats;
+  onInactiveStudent: () => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const handleOpenStudent = () => {
+    if (!user.active) {
+      onInactiveStudent();
+      return;
+    }
+
+    navigate(`/painel/colaboradores/${user.id}`);
+  };
 
   return (
-    <div className="rounded-md border border-gray-200 bg-white">
+    <div
+      className={`rounded-md border bg-white ${
+        user.active ? "border-gray-200" : "border-red-100"
+      }`}
+    >
       <button
         type="button"
         onClick={() => setIsOpen((current) => !current)}
         className="flex w-full items-center justify-between gap-4 p-4 text-left"
       >
         <div className="flex items-center gap-4">
-          {user.profilePhoto ? (
-            <img
-              src={user.profilePhoto}
-              alt={user.name}
-              className="size-14 rounded-full object-cover"
-            />
-          ) : (
-            <div className="size-14 rounded-full bg-primary-50 flex items-center justify-center text-primary font-bold">
-              {user.name.charAt(0)}
-            </div>
-          )}
+          <span
+            role="button"
+            tabIndex={0}
+            title={user.active ? "Abrir dados do colaborador" : "Colaborador inativo"}
+            onClick={(event) => {
+              event.stopPropagation();
+              handleOpenStudent();
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                event.stopPropagation();
+                handleOpenStudent();
+              }
+            }}
+            className={`rounded-full transition ${
+              user.active
+                ? "cursor-pointer hover:scale-105"
+                : "cursor-not-allowed opacity-60"
+            }`}
+          >
+            {user.profilePhoto ? (
+              <img
+                src={user.profilePhoto}
+                alt={user.name}
+                className={`size-14 rounded-full object-cover ${
+                  user.active ? "" : "grayscale"
+                }`}
+              />
+            ) : (
+              <div
+                className={`size-14 rounded-full flex items-center justify-center font-bold ${
+                  user.active
+                    ? "bg-primary-50 text-primary"
+                    : "bg-red-50 text-red-600"
+                }`}
+              >
+                {user.name.charAt(0)}
+              </div>
+            )}
+          </span>
 
           <div>
-            <p className="font-semibold text-neutral-900">
-              {user.name} {user.lastName}
-            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleOpenStudent();
+                }}
+                className={`font-semibold ${
+                  user.active
+                    ? "text-neutral-900 hover:text-primary"
+                    : "cursor-not-allowed text-neutral-500"
+                }`}
+              >
+                {user.name} {user.lastName}
+              </button>
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                  user.active
+                    ? "bg-green-50 text-green-700"
+                    : "bg-red-50 text-red-700"
+                }`}
+              >
+                {user.active ? "Ativo" : "Inativo"}
+              </span>
+            </div>
             <p className="text-sm text-neutral-600">{user.email}</p>
+            {!user.active && (
+              <p className="mt-1 text-xs font-medium text-red-600">
+                Colaborador inativo
+              </p>
+            )}
           </div>
         </div>
 
@@ -572,64 +720,155 @@ function LinkedStudentCard({
 type FormListGroupProps = {
   forms: TrainingFormSummary[];
   onOpen: (formId: string) => void;
+  trashedForms: TrashedForm[];
+  onRestore: (formId: string) => void;
+  onDeleteForever: (formId: string) => void;
+  onEmptyTrash: () => void;
 };
 
-function FormListGroup({ forms, onOpen }: FormListGroupProps) {
+function FormListGroup({
+  forms,
+  onOpen,
+  trashedForms,
+  onRestore,
+  onDeleteForever,
+  onEmptyTrash,
+}: FormListGroupProps) {
   return (
-    <div className="rounded-md border border-gray-200 bg-neutral-50 p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="font-semibold text-neutral-900">Formularios criados</h3>
-        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-neutral-600">
-          {forms.length} formulario(s)
-        </span>
+    <div className="flex flex-col gap-4">
+      <div className="rounded-md border border-gray-200 bg-neutral-50 p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="font-semibold text-neutral-900">Formularios criados</h3>
+          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-neutral-600">
+            {forms.length} formulario(s)
+          </span>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          {forms.map((form) => (
+            <button
+              key={form.idForm}
+              type="button"
+              onClick={() => onOpen(form.idForm)}
+              className="rounded-md bg-white p-4 text-left shadow-sm transition hover:border-primary hover:shadow-md"
+            >
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-primary">
+                    {trainingFormTypeLabel(form.formType)}
+                  </p>
+                  <h4 className="font-semibold text-neutral-900">{form.title}</h4>
+                </div>
+                <span className="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary">
+                  {form.questionCount} perguntas
+                </span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 text-sm text-neutral-600">
+                <div>
+                  <span>Inicio</span>
+                  <p className="font-semibold text-neutral-900">
+                    {form.initDate}
+                  </p>
+                </div>
+                <div>
+                  <span>Termino</span>
+                  <p className="font-semibold text-neutral-900">
+                    {form.endDate}
+                  </p>
+                </div>
+                <div>
+                  <span>Minimo</span>
+                  <p className="font-semibold text-neutral-900">
+                    {form.minCorrectPercentage}%
+                  </p>
+                </div>
+              </div>
+            </button>
+          ))}
+
+          {forms.length === 0 && (
+            <div className="rounded-md border border-dashed border-primary-200 bg-primary-50 p-4 text-sm text-neutral-700">
+              Nenhum formulario criado para esta etapa.
+            </div>
+          )}
+        </div>
+      </div>
+
+      <FormsTrashList
+        forms={trashedForms}
+        onRestore={onRestore}
+        onDeleteForever={onDeleteForever}
+        onEmptyTrash={onEmptyTrash}
+      />
+    </div>
+  );
+}
+
+function FormsTrashList({
+  forms,
+  onRestore,
+  onDeleteForever,
+  onEmptyTrash,
+}: {
+  forms: TrashedForm[];
+  onRestore: (formId: string) => void;
+  onDeleteForever: (formId: string) => void;
+  onEmptyTrash: () => void;
+}) {
+  return (
+    <div className="rounded-md border border-red-100 bg-red-50 p-4">
+      <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h3 className="font-semibold text-red-800">Lixeira de formularios</h3>
+          <p className="text-sm text-red-700">
+            Formularios aqui ainda nao foram excluidos definitivamente.
+          </p>
+        </div>
+        <Button
+          className="bg-red-600 text-white"
+          isDisabled={forms.length === 0}
+          onPress={onEmptyTrash}
+        >
+          <Trash2 size={16} />
+          Esvaziar lixeira
+        </Button>
       </div>
 
       <div className="flex flex-col gap-3">
-        {forms.map((form) => (
-          <button
+        {forms.map(({ form, deletedAt }) => (
+          <div
             key={form.idForm}
-            type="button"
-            onClick={() => onOpen(form.idForm)}
-            className="rounded-md bg-white p-4 text-left shadow-sm transition hover:border-primary hover:shadow-md"
+            className="rounded-md bg-white p-4 shadow-sm"
           >
-            <div className="mb-3 flex items-start justify-between gap-3">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="text-sm font-semibold text-primary">
                   {trainingFormTypeLabel(form.formType)}
                 </p>
                 <h4 className="font-semibold text-neutral-900">{form.title}</h4>
+                <p className="mt-1 text-xs text-neutral-500">
+                  Movido em {formatTrashDate(deletedAt)}
+                </p>
               </div>
-              <span className="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary">
-                {form.questionCount} perguntas
-              </span>
-            </div>
 
-            <div className="grid grid-cols-3 gap-3 text-sm text-neutral-600">
-              <div>
-                <span>Inicio</span>
-                <p className="font-semibold text-neutral-900">
-                  {form.initDate}
-                </p>
-              </div>
-              <div>
-                <span>Termino</span>
-                <p className="font-semibold text-neutral-900">
-                  {form.endDate}
-                </p>
-              </div>
-              <div>
-                <span>Minimo</span>
-                <p className="font-semibold text-neutral-900">
-                  {form.minCorrectPercentage}%
-                </p>
+              <div className="flex flex-wrap gap-2">
+                <Button className="bg-primary text-white" onPress={() => onRestore(form.idForm)}>
+                  <Undo2 size={16} />
+                  Restaurar
+                </Button>
+                <Button className="bg-red-600 text-white" onPress={() => onDeleteForever(form.idForm)}>
+                  <Trash2 size={16} />
+                  Excluir
+                </Button>
               </div>
             </div>
-          </button>
+          </div>
         ))}
 
         {forms.length === 0 && (
-          <div className="rounded-md border border-dashed border-primary-200 bg-primary-50 p-4 text-sm text-neutral-700">
-            Nenhum formulario criado para esta etapa.
+          <div className="rounded-md border border-dashed border-red-200 bg-white p-4 text-sm text-neutral-600">
+            Lixeira vazia.
           </div>
         )}
       </div>
@@ -639,6 +878,23 @@ function FormListGroup({ forms, onOpen }: FormListGroupProps) {
 
 function trainingFormTypeLabel(type: ApiFormType) {
   return type === "PRE_TEST" ? "Pre-teste" : "Pos-teste";
+}
+
+function compareFormsByTitle(current: TrainingFormSummary, next: TrainingFormSummary) {
+  return current.title.localeCompare(next.title, "pt-BR");
+}
+
+function formatTrashDate(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "data indisponivel";
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
 }
 
 function buildStudentStats(
