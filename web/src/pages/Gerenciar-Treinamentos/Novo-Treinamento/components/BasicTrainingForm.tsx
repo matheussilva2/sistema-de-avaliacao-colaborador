@@ -4,6 +4,7 @@ import type { TrainingFormData } from "../types";
 type BasicTrainingFormProps = {
   form: TrainingFormData;
   onChange: (field: keyof TrainingFormData, value: string) => void;
+  fieldErrors?: Partial<Record<keyof TrainingFormData, string>>;
   selectedImageName?: string;
   onImageChange: (file: File | null) => void;
 };
@@ -11,6 +12,7 @@ type BasicTrainingFormProps = {
 export function BasicTrainingForm({
   form,
   onChange,
+  fieldErrors = {},
   selectedImageName,
   onImageChange,
 }: BasicTrainingFormProps) {
@@ -51,6 +53,7 @@ export function BasicTrainingForm({
             className="bg-white border-2 border-neutral-300 focus:border-primary focus:ring-2 focus:ring-primary/20"
             required
           />
+          <FieldError message={fieldErrors.title} />
         </div>
 
         <div className="grid grid-cols-3 gap-4">
@@ -67,6 +70,7 @@ export function BasicTrainingForm({
               className="bg-white border-2 border-neutral-300 focus:border-primary focus:ring-2 focus:ring-primary/20"
               required
             />
+            <FieldError message={fieldErrors.hours} />
           </div>
 
           <div className="flex flex-col gap-2">
@@ -80,6 +84,7 @@ export function BasicTrainingForm({
               className="bg-white border-2 border-neutral-300 focus:border-primary focus:ring-2 focus:ring-primary/20"
               required
             />
+            <FieldError message={fieldErrors.startDate} />
           </div>
 
           <div className="flex flex-col gap-2">
@@ -93,6 +98,7 @@ export function BasicTrainingForm({
               className="bg-white border-2 border-neutral-300 focus:border-primary focus:ring-2 focus:ring-primary/20"
               required
             />
+            <FieldError message={fieldErrors.endDate} />
           </div>
         </div>
 
@@ -107,8 +113,17 @@ export function BasicTrainingForm({
             className="bg-white border-2 border-neutral-300 rounded-md p-3 text-sm outline-none resize-none min-h-[120px] focus:border-primary focus:ring-2 focus:ring-primary/20"
             required
           />
+          <FieldError message={fieldErrors.description} />
         </div>
       </div>
     </Card>
   );
+}
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) {
+    return null;
+  }
+
+  return <p className="text-xs font-semibold text-red-600">{message}</p>;
 }
