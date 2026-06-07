@@ -9,15 +9,16 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 public record UserUpdateRecordDTO(
-        @NotBlank String name,
-        @NotBlank String lastName,
-        @NotBlank @Email String email,
+        @NotBlank(message = "Nome e obrigatorio") String name,
+        @NotBlank(message = "Sobrenome e obrigatorio") String lastName,
+        @NotBlank(message = "Email e obrigatorio")
+        @Email(message = "Email invalido") String email,
         String passWord,
-        @NotBlank String phone,
-        @NotBlank String cpf,
-        @NotNull LocalDate hireDate,
-        @NotNull LocalDate registrationDate,
-        @NotNull UserRole userRole,
-        @NotNull Boolean active,
+        @NotBlank(message = "Telefone e obrigatorio") String phone,
+        @NotBlank(message = "CPF e obrigatorio") String cpf,
+        @NotNull(message = "Data de contratacao e obrigatoria") LocalDate hireDate,
+        @NotNull(message = "Data de registro e obrigatoria") LocalDate registrationDate,
+        @NotNull(message = "Tipo de usuario e obrigatorio") UserRole userRole,
+        @NotNull(message = "Status ativo e obrigatorio") Boolean active,
         UUID managerId
 ) {}

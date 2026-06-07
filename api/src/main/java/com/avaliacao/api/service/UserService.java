@@ -5,6 +5,7 @@ import com.avaliacao.api.dtos.UserPhotoRecordDTO;
 import com.avaliacao.api.dtos.UserRecordDTO;
 import com.avaliacao.api.dtos.UserUpdateRecordDTO;
 import com.avaliacao.api.enums.UserRole;
+import com.avaliacao.api.exceptions.FieldValidationException;
 import com.avaliacao.api.models.TrainingModel;
 import com.avaliacao.api.models.UserModel;
 import com.avaliacao.api.repositories.UserRepository;
@@ -14,6 +15,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -30,15 +32,15 @@ public class UserService {
     }
 
     public UserModel create(UserRecordDTO userRecordDTO){
-        validateCpf(userRecordDTO.cpf());
-        validateDates(userRecordDTO.hireDate(), userRecordDTO.registrationDate());
-        validatePassword(userRecordDTO.passWord());
-
-        var userWithSameEmail = userRepository.findByEmail(userRecordDTO.email());
-
-        if(userWithSameEmail.isPresent()){
-            throw new IllegalArgumentException("Email already registered.");
-        }
+        validateUserFields(
+                userRecordDTO.email(),
+                userRecordDTO.cpf(),
+                userRecordDTO.phone(),
+                userRecordDTO.hireDate(),
+                userRecordDTO.registrationDate(),
+                userRecordDTO.passWord(),
+                null,
+                true);
 
         var user = new UserModel();
 
@@ -46,21 +48,22 @@ public class UserService {
         BeanUtils.copyProperties(userRecordDTO,user);
 
         user.setPassWord(encryptedPassword);
+        applyNormalizedUserFields(user, userRecordDTO.email(), userRecordDTO.cpf(), userRecordDTO.phone());
         setManagerIfPresent(user, userRecordDTO.managerId());
 
         return userRepository.save(user);
     }
 
     public UserModel createForManager(UUID managerId, UserRecordDTO userRecordDTO){
-        validateCpf(userRecordDTO.cpf());
-        validateDates(userRecordDTO.hireDate(), userRecordDTO.registrationDate());
-        validatePassword(userRecordDTO.passWord());
-
-        var userWithSameEmail = userRepository.findByEmail(userRecordDTO.email());
-
-        if(userWithSameEmail.isPresent()){
-            throw new IllegalArgumentException("Email already registered.");
-        }
+        validateUserFields(
+                userRecordDTO.email(),
+                userRecordDTO.cpf(),
+                userRecordDTO.phone(),
+                userRecordDTO.hireDate(),
+                userRecordDTO.registrationDate(),
+                userRecordDTO.passWord(),
+                null,
+                true);
 
         var manager = getManagerOrThrow(managerId);
         var user = new UserModel();
@@ -70,6 +73,7 @@ public class UserService {
 
         user.setPassWord(encryptedPassword);
         user.setUserRole(UserRole.EMPLOYEE);
+        applyNormalizedUserFields(user, userRecordDTO.email(), userRecordDTO.cpf(), userRecordDTO.phone());
         user.setManager(manager);
 
         return userRepository.save(user);
@@ -89,7 +93,7 @@ public class UserService {
     }
 
     public Optional<UserModel> login(LoginRecordDTO loginRecordDTO){
-        var userO = userRepository.findByEmail(loginRecordDTO.email());
+        var userO = userRepository.findByEmailIgnoreCase(loginRecordDTO.email().trim());
 
         if(userO.isEmpty()){
             return Optional.empty();
@@ -122,23 +126,21 @@ public class UserService {
 
         var user = userO.get();
 
-        validateCpf(userRecordDTO.cpf());
-        validateDates(userRecordDTO.hireDate(), userRecordDTO.registrationDate());
-
-        if(userRecordDTO.passWord() != null && !userRecordDTO.passWord().isBlank()){
-            validatePassword(userRecordDTO.passWord());
-        }
-
-        var userWithSameEmail = userRepository.findByEmail(userRecordDTO.email());
-
-        if(userWithSameEmail.isPresent() && !userWithSameEmail.get().getId().equals(id)){
-            throw new IllegalArgumentException("Email already registered.");
-        }
+        validateUserFields(
+                userRecordDTO.email(),
+                userRecordDTO.cpf(),
+                userRecordDTO.phone(),
+                userRecordDTO.hireDate(),
+                userRecordDTO.registrationDate(),
+                userRecordDTO.passWord(),
+                id,
+                false);
 
         String currentPassword = user.getPassWord();
         UserRole currentUserRole = user.getUserRole();
 
         BeanUtils.copyProperties(userRecordDTO,user);
+        applyNormalizedUserFields(user, userRecordDTO.email(), userRecordDTO.cpf(), userRecordDTO.phone());
 
         if(currentUserRole == UserRole.EMPLOYEE){
             user.setUserRole(UserRole.EMPLOYEE);
@@ -211,47 +213,115 @@ public class UserService {
         user.setManager(getManagerOrThrow(managerId));
     }
 
-    private void validateDates(LocalDate hireDate, LocalDate registrationDate){
+    private void validateUserFields(
+            String email,
+            String cpf,
+            String phone,
+            LocalDate hireDate,
+            LocalDate registrationDate,
+            String password,
+            UUID currentUserId,
+            boolean requirePassword){
+
+        var errors = new LinkedHashMap<String, String>();
+
+        if(!isValidCpf(cpf)){
+            errors.put("cpf", "CPF invalido");
+        }
+
+        if(!isValidPhone(phone)){
+            errors.put("phone", "Telefone deve ter 10 ou 11 digitos");
+        }
+
+        validateDates(hireDate, registrationDate, errors);
+
+        if(requirePassword || (password != null && !password.isBlank())){
+            validatePassword(password, errors);
+        }
+
+        validateEmailAvailability(email, currentUserId, errors);
+
+        if(!errors.isEmpty()){
+            throw new FieldValidationException(errors);
+        }
+    }
+
+    private void validateEmailAvailability(
+            String email,
+            UUID currentUserId,
+            LinkedHashMap<String, String> errors){
+
+        var normalizedEmail = email == null ? "" : email.trim();
+
+        if(normalizedEmail.isBlank()){
+            return;
+        }
+
+        var userWithSameEmail = userRepository.findByEmailIgnoreCase(normalizedEmail);
+
+        if(userWithSameEmail.isPresent() &&
+                (currentUserId == null || !userWithSameEmail.get().getId().equals(currentUserId))){
+            errors.put("email", "Ja existe uma conta cadastrada com esse email");
+        }
+    }
+
+    private void validateDates(
+            LocalDate hireDate,
+            LocalDate registrationDate,
+            LinkedHashMap<String, String> errors){
+        if(hireDate == null || registrationDate == null){
+            return;
+        }
+
         var today = LocalDate.now();
         var thirtyYearsAgo = today.minusYears(30);
 
         if(hireDate.isBefore(registrationDate)){
-            throw new IllegalArgumentException("Hire date cannot be before registration date.");
+            errors.put("hireDate", "Data de contratacao nao pode ser anterior a data de registro");
         }
 
         if(hireDate.isBefore(thirtyYearsAgo)){
-            throw new IllegalArgumentException("Hire date cannot be more than 30 years ago.");
+            errors.put("hireDate", "Data de contratacao nao pode ser inferior a 30 anos");
         }
 
         if(hireDate.isAfter(today)){
-            throw new IllegalArgumentException("Hire date cannot be after today.");
+            errors.put("hireDate", "Data de contratacao nao pode ser superior ao dia de hoje");
         }
     }
 
-    private void validatePassword(String password){
+    private void validatePassword(String password, LinkedHashMap<String, String> errors){
         if(password == null ||
                 password.length() < 8 ||
                 !password.matches(".*[A-Z].*") ||
                 !password.matches(".*[a-z].*") ||
                 !password.matches(".*\\d.*")){
-            throw new IllegalArgumentException("Password does not meet requirements.");
+            errors.put("passWord", "Senha deve ter no minimo 8 caracteres, uma letra maiuscula, uma letra minuscula e um numero");
         }
     }
 
-    private void validateCpf(String cpf){
+    private boolean isValidCpf(String cpf){
         var digits = cpf == null ? "" : cpf.replaceAll("\\D", "");
 
         if(digits.length() != 11 || digits.matches("(\\d)\\1{10}")){
-            throw new IllegalArgumentException("Invalid CPF.");
+            return false;
         }
 
         int firstDigit = calculateCpfDigit(digits.substring(0,9), 10);
         int secondDigit = calculateCpfDigit(digits.substring(0,9) + firstDigit, 11);
 
-        if(firstDigit != Character.getNumericValue(digits.charAt(9)) ||
-                secondDigit != Character.getNumericValue(digits.charAt(10))){
-            throw new IllegalArgumentException("Invalid CPF.");
-        }
+        return firstDigit == Character.getNumericValue(digits.charAt(9)) &&
+                secondDigit == Character.getNumericValue(digits.charAt(10));
+    }
+
+    private boolean isValidPhone(String phone){
+        var digits = phone == null ? "" : phone.replaceAll("\\D", "");
+        return digits.length() == 10 || digits.length() == 11;
+    }
+
+    private void applyNormalizedUserFields(UserModel user, String email, String cpf, String phone){
+        user.setEmail(email.trim().toLowerCase());
+        user.setCpf(cpf.replaceAll("\\D", ""));
+        user.setPhone(phone.trim());
     }
 
     private int calculateCpfDigit(String digits, int weight){
