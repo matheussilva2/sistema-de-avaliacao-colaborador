@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Button, Card, Input, Skeleton } from "@heroui/react";
-import { Undo2, X } from "lucide-react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { TestFormSection } from "../Novo-Treinamento/components/TestFormSection";
 import type { Question, TestType } from "../Novo-Treinamento/types";
@@ -8,6 +7,9 @@ import {
   createFormQuestion,
   createQuestionAlternative,
   createTrainingForm,
+  deleteAlternative,
+  deleteQuestion,
+  deleteTrainingForm,
   getFormQuestions,
   getQuestionAlternatives,
   getTrainingResults,
@@ -19,8 +21,10 @@ import {
 import { getTrainingById, type ApiTraining } from "../../../services/trainingService";
 import {
   moveFormToTrash,
+  removeFormFromTrash,
   restoreFormFromTrash,
 } from "../../../services/formTrashService";
+import { useUndoableDelete } from "../../../components/UndoDeleteProvider";
 
 type ManagedTrainingForm = {
   id: string;
@@ -66,10 +70,6 @@ type LocationState = {
   };
 };
 
-type PendingUndo = {
-  form: ApiForm;
-};
-
 export default function FormulariosTreinamento() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -85,9 +85,9 @@ export default function FormulariosTreinamento() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isLockedByAnswers, setIsLockedByAnswers] = useState(false);
-  const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const { scheduleUndoableDelete } = useUndoableDelete();
 
   useEffect(() => {
     async function loadForms() {
@@ -134,18 +134,6 @@ export default function FormulariosTreinamento() {
     loadForms();
   }, [defaultType, selectedFormId, trainingId]);
 
-  useEffect(() => {
-    if (!pendingUndo) {
-      return;
-    }
-
-    const undoTimer = window.setTimeout(() => {
-      navigate(`/painel/gerenciar-treinamentos/${trainingId}`);
-    }, 5000);
-
-    return () => window.clearTimeout(undoTimer);
-  }, [navigate, pendingUndo, trainingId]);
-
   const title = training?.title ?? state?.trainingDraft?.title ?? "Novo treinamento";
 
   const updateForm = (
@@ -187,21 +175,40 @@ export default function FormulariosTreinamento() {
     }
 
     const apiForm = mapManagedFormToApiForm(form);
-    moveFormToTrash(trainingId, apiForm);
-    setForms((prev) => prev.filter((form) => form.id !== formId));
-    setPendingUndo({ form: apiForm });
-    setSuccessMessage("");
-    setErrorMessage("");
-  };
 
-  const handleUndoDelete = () => {
-    if (!pendingUndo || !trainingId) {
-      return;
-    }
-
-    restoreFormFromTrash(trainingId, pendingUndo.form.idForm);
-    setForms([mapApiFormToManagedForm(trainingId, pendingUndo.form)]);
-    setPendingUndo(null);
+    scheduleUndoableDelete({
+      id: `form:${apiForm.idForm}`,
+      title: "Formulario removido",
+      description: `${apiForm.title} sera excluido definitivamente em 5 segundos.`,
+      onStart: () => {
+        moveFormToTrash(trainingId, apiForm);
+        setForms((prev) => prev.filter((formItem) => formItem.id !== formId));
+        setSuccessMessage("");
+        setErrorMessage("");
+      },
+      onUndo: () => {
+        restoreFormFromTrash(trainingId, apiForm.idForm);
+        setForms((prev) =>
+          [...prev, form].sort((current, next) =>
+            current.title.localeCompare(next.title, "pt-BR"),
+          ),
+        );
+      },
+      onCommit: async () => {
+        await deleteTrainingForm(apiForm.idForm);
+        removeFormFromTrash(trainingId, apiForm.idForm);
+        navigate(`/painel/gerenciar-treinamentos/${trainingId}`);
+      },
+      onCommitError: () => {
+        restoreFormFromTrash(trainingId, apiForm.idForm);
+        setForms((prev) =>
+          prev.some((formItem) => formItem.id === form.id)
+            ? prev
+            : [...prev, form],
+        );
+        setErrorMessage("Nao foi possivel excluir definitivamente o formulario.");
+      },
+    });
   };
 
   const updateQuestions = (
@@ -232,9 +239,62 @@ export default function FormulariosTreinamento() {
   };
 
   const handleRemoveQuestion = (formId: string, qId: string) => {
-    updateQuestions(formId, (questions) =>
-      questions.filter((question) => question.id !== qId),
-    );
+    const currentForm = forms.find((form) => form.id === formId);
+    const question = currentForm?.questions.find((item) => item.id === qId);
+
+    if (!question) {
+      return;
+    }
+
+    const questionIndex = currentForm?.questions.findIndex((item) => item.id === qId) ?? -1;
+    const removeQuestionFromState = () => {
+      updateQuestions(formId, (questions) =>
+        questions.filter((item) => item.id !== qId),
+      );
+    };
+    const restoreQuestionToState = () => {
+      updateQuestions(formId, (questions) => {
+        if (questions.some((item) => item.id === question.id)) {
+          return questions;
+        }
+
+        const nextQuestions = [...questions];
+        nextQuestions.splice(Math.max(questionIndex, 0), 0, question);
+        return nextQuestions;
+      });
+    };
+
+    if (!question.persistedId) {
+      scheduleUndoableDelete({
+        id: `draft-question:${question.id}`,
+        title: "Pergunta removida",
+        description: "A pergunta sera removida do formulario em 5 segundos.",
+        onStart: removeQuestionFromState,
+        onUndo: restoreQuestionToState,
+        onCommit: () => undefined,
+      });
+      return;
+    }
+
+    scheduleUndoableDelete({
+      id: `question:${question.persistedId}`,
+      title: "Pergunta removida",
+      description: `${question.title || "Pergunta"} sera excluida definitivamente em 5 segundos.`,
+      onStart: removeQuestionFromState,
+      onUndo: restoreQuestionToState,
+      onCommit: async () => {
+        await Promise.all(
+          question.options
+            .filter((option) => option.persistedId)
+            .map((option) => deleteAlternative(option.persistedId as string)),
+        );
+        await deleteQuestion(question.persistedId as string);
+      },
+      onCommitError: () => {
+        restoreQuestionToState();
+        setErrorMessage("Nao foi possivel excluir definitivamente a pergunta.");
+      },
+    });
   };
 
   const handleAddOption = (formId: string, qId: string) => {
@@ -291,16 +351,59 @@ export default function FormulariosTreinamento() {
   };
 
   const handleRemoveOption = (formId: string, qId: string, optId: string) => {
-    updateQuestions(formId, (questions) =>
-      questions.map((question) =>
-        question.id === qId
-          ? {
-              ...question,
-              options: question.options.filter((option) => option.id !== optId),
-            }
-          : question,
-      ),
-    );
+    const currentForm = forms.find((form) => form.id === formId);
+    const question = currentForm?.questions.find((item) => item.id === qId);
+    const option = question?.options.find((item) => item.id === optId);
+
+    if (!question || !option) {
+      return;
+    }
+
+    const optionIndex = question.options.findIndex((item) => item.id === optId);
+    const removeOptionFromState = () => {
+      updateQuestions(formId, (questions) =>
+        questions.map((item) =>
+          item.id === qId
+            ? {
+                ...item,
+                options: item.options.filter((currentOption) => currentOption.id !== optId),
+              }
+            : item,
+        ),
+      );
+    };
+    const restoreOptionToState = () => {
+      updateQuestions(formId, (questions) =>
+        questions.map((item) => {
+          if (item.id !== qId || item.options.some((currentOption) => currentOption.id === option.id)) {
+            return item;
+          }
+
+          const nextOptions = [...item.options];
+          nextOptions.splice(Math.max(optionIndex, 0), 0, option);
+          return { ...item, options: nextOptions };
+        }),
+      );
+    };
+
+    scheduleUndoableDelete({
+      id: option.persistedId
+        ? `alternative:${option.persistedId}`
+        : `draft-alternative:${option.id}`,
+      title: "Alternativa removida",
+      description: `${option.text || "Alternativa"} sera excluida definitivamente em 5 segundos.`,
+      onStart: removeOptionFromState,
+      onUndo: restoreOptionToState,
+      onCommit: async () => {
+        if (option.persistedId) {
+          await deleteAlternative(option.persistedId);
+        }
+      },
+      onCommitError: () => {
+        restoreOptionToState();
+        setErrorMessage("Nao foi possivel excluir definitivamente a alternativa.");
+      },
+    });
   };
 
   const handleSave = async () => {
@@ -558,38 +661,6 @@ export default function FormulariosTreinamento() {
           </Button>
         </div>
       </div>
-
-      {pendingUndo && (
-        <div className="fixed bottom-6 right-6 z-50 w-[min(420px,calc(100vw-3rem))] rounded-md border border-gray-200 bg-white p-4 shadow-xl">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="font-semibold text-neutral-900">
-                Formulario movido para a lixeira
-              </p>
-              <p className="mt-1 text-sm text-neutral-600">
-                {pendingUndo.form.title} sera mantido na lixeira ate a exclusao
-                definitiva.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setPendingUndo(null)}
-              className="rounded-md p-1 text-neutral-500 transition hover:bg-gray-100 hover:text-neutral-900"
-              aria-label="Fechar aviso"
-            >
-              <X size={18} />
-            </button>
-          </div>
-
-          <div className="mt-4 flex justify-end">
-            <Button className="bg-primary text-white" onPress={handleUndoDelete}>
-              <Undo2 size={16} />
-              Desfazer
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -669,9 +740,11 @@ async function hydrateForm(trainingId: string, form: ApiForm): Promise<ManagedTr
 
       return {
         id: question.idQuestion,
+        persistedId: question.idQuestion,
         title: question.title,
         options: alternatives.map((alternative) => ({
           id: alternative.idAlternative,
+          persistedId: alternative.idAlternative,
           text: alternative.text,
           isCorrect: alternative.correct,
         })),
@@ -700,19 +773,5 @@ function mapManagedFormToApiForm(form: ManagedTrainingForm): ApiForm {
     initDate: form.startDeadline,
     endDate: form.endDeadline,
     minCorrectPercentage: Number(form.minCorrect),
-  };
-}
-
-function mapApiFormToManagedForm(trainingId: string, form: ApiForm): ManagedTrainingForm {
-  return {
-    id: form.idForm,
-    persistedId: form.idForm,
-    trainingId,
-    title: form.title,
-    type: mapApiFormType(form.formType),
-    startDeadline: form.initDate,
-    endDeadline: form.endDate,
-    minCorrect: String(form.minCorrectPercentage),
-    questions: [],
   };
 }

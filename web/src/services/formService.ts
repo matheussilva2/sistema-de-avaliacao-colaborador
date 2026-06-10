@@ -109,6 +109,12 @@ export function createFormQuestion(formId: string, title: string) {
   });
 }
 
+export function deleteQuestion(questionId: string) {
+  return request<string>(`/questions/${questionId}`, {
+    method: "DELETE",
+  });
+}
+
 export function getQuestionAlternatives(questionId: string) {
   return request<ApiAlternative[]>(`/questions/${questionId}/alternatives`, {
     method: "GET",
@@ -123,6 +129,12 @@ export function createQuestionAlternative(
   return request<ApiAlternative>(`/questions/${questionId}/alternatives`, {
     method: "POST",
     body: JSON.stringify({ text, correct }),
+  });
+}
+
+export function deleteAlternative(alternativeId: string) {
+  return request<string>(`/alternatives/${alternativeId}`, {
+    method: "DELETE",
   });
 }
 

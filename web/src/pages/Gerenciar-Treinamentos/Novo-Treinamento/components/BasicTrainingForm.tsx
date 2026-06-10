@@ -7,6 +7,7 @@ type BasicTrainingFormProps = {
   fieldErrors?: Partial<Record<keyof TrainingFormData, string>>;
   selectedImageName?: string;
   onImageChange: (file: File | null) => void;
+  isDisabled?: boolean;
 };
 
 export function BasicTrainingForm({
@@ -15,6 +16,7 @@ export function BasicTrainingForm({
   fieldErrors = {},
   selectedImageName,
   onImageChange,
+  isDisabled = false,
 }: BasicTrainingFormProps) {
   return (
     <Card className="p-6 border-t-4 border-l-4 border-primary shadow-lg">
@@ -32,6 +34,7 @@ export function BasicTrainingForm({
             id="trainingImage"
             type="file"
             accept="image/*"
+            disabled={isDisabled}
             onChange={(e) => onImageChange(e.target.files?.[0] ?? null)}
             className="bg-white border-2 border-neutral-300 rounded-md p-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
           />
@@ -49,6 +52,7 @@ export function BasicTrainingForm({
           <Input
             placeholder="Titulo do treinamento"
             value={form.title}
+            disabled={isDisabled}
             onChange={(e) => onChange("title", e.target.value)}
             className="bg-white border-2 border-neutral-300 focus:border-primary focus:ring-2 focus:ring-primary/20"
             required
@@ -66,6 +70,7 @@ export function BasicTrainingForm({
               min="1"
               placeholder="Carga horaria (h)"
               value={form.hours}
+              disabled={isDisabled}
               onChange={(e) => onChange("hours", e.target.value)}
               className="bg-white border-2 border-neutral-300 focus:border-primary focus:ring-2 focus:ring-primary/20"
               required
@@ -80,6 +85,7 @@ export function BasicTrainingForm({
             <Input
               type="date"
               value={form.startDate}
+              disabled={isDisabled}
               onChange={(e) => onChange("startDate", e.target.value)}
               className="bg-white border-2 border-neutral-300 focus:border-primary focus:ring-2 focus:ring-primary/20"
               required
@@ -94,6 +100,7 @@ export function BasicTrainingForm({
             <Input
               type="date"
               value={form.endDate}
+              disabled={isDisabled}
               onChange={(e) => onChange("endDate", e.target.value)}
               className="bg-white border-2 border-neutral-300 focus:border-primary focus:ring-2 focus:ring-primary/20"
               required
@@ -109,6 +116,7 @@ export function BasicTrainingForm({
           <textarea
             placeholder="Descricao do treinamento..."
             value={form.description}
+            disabled={isDisabled}
             onChange={(e) => onChange("description", e.target.value)}
             className="bg-white border-2 border-neutral-300 rounded-md p-3 text-sm outline-none resize-none min-h-[120px] focus:border-primary focus:ring-2 focus:ring-primary/20"
             required

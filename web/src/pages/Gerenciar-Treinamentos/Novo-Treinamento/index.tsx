@@ -9,9 +9,11 @@ import {
   type ApiTraining,
   updateTrainingImage,
 } from "../../../services/trainingService";
+import { useUndoableAction } from "../../../components/UndoDeleteProvider";
 
 export default function CriarTreinamento() {
   const navigate = useNavigate();
+  const { scheduleUndoableAction } = useUndoableAction();
   const [trainingImage, setTrainingImage] = useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -41,7 +43,7 @@ export default function CriarTreinamento() {
     description: trainingForm.description,
   });
 
-  const saveTraining = async () => {
+  const prepareTrainingCreation = () => {
     const manager = getAuthenticatedUser();
 
     if (!manager || manager.userRole !== "MANAGER") {
@@ -58,54 +60,92 @@ export default function CriarTreinamento() {
       return null;
     }
 
+    return {
+      managerId: manager.id,
+      normalizedForm,
+      payload: buildTrainingPayload(normalizedForm),
+    };
+  };
+
+  const scheduleTrainingCreation = (nextStep: "list" | "forms") => {
+    const preparedTraining = prepareTrainingCreation();
+
+    if (!preparedTraining) {
+      return;
+    }
+
+    const imageSnapshot = trainingImage;
+
     setIsSaving(true);
     setErrorMessage("");
     setFieldErrors({});
 
-    try {
-      const createdTraining = await createTrainingForManager(
-        manager.id,
-        buildTrainingPayload(normalizedForm),
-      );
+    scheduleUndoableAction({
+      id: `training:create:${preparedTraining.managerId}`,
+      title: "Criacao de treinamento",
+      description: "O treinamento sera criado em 5 segundos.",
+      onStart: () => {
+        setForm(preparedTraining.normalizedForm);
+      },
+      onUndo: () => {
+        setIsSaving(false);
+      },
+      onCommit: async () => {
+        try {
+          const createdTraining = await createTrainingForManager(
+            preparedTraining.managerId,
+            preparedTraining.payload,
+          );
+          const savedTraining = imageSnapshot
+            ? await updateTrainingImage(
+                createdTraining.idTraining,
+                await readFileAsDataUrl(imageSnapshot),
+              )
+            : createdTraining;
 
-      if (trainingImage) {
-        const imageDataUrl = await readFileAsDataUrl(trainingImage);
-        return await updateTrainingImage(createdTraining.idTraining, imageDataUrl);
-      }
+          if (nextStep === "forms") {
+            navigate("/painel/gerenciar-treinamentos/novo-treinamento/formularios", {
+              state: {
+                trainingDraft: buildFormsNavigationState(
+                  savedTraining,
+                  imageSnapshot?.name ?? null,
+                ),
+              },
+            });
+            return;
+          }
 
-      return createdTraining;
-    } catch (error) {
-      if (error instanceof ApiRequestError) {
-        const message = getCreateTrainingErrorMessage(error.message);
-        setErrorMessage(message.global);
-
-        const field = message.field;
-        const fieldMessage = message.fieldMessage;
-
-        if (field && fieldMessage) {
-          setFieldErrors((prev) => ({ ...prev, [field]: fieldMessage }));
+          navigate("/painel/gerenciar-treinamentos");
+        } finally {
+          setIsSaving(false);
         }
-      } else {
-        setErrorMessage("Nao foi possivel criar o treinamento. Verifique a API.");
-      }
+      },
+      onCommitError: (error) => {
+        if (error instanceof ApiRequestError) {
+          const message = getCreateTrainingErrorMessage(error.message);
+          setErrorMessage(message.global);
 
-      return null;
-    } finally {
-      setIsSaving(false);
-    }
+          const field = message.field;
+          const fieldMessage = message.fieldMessage;
+
+          if (field && fieldMessage) {
+            setFieldErrors((prev) => ({ ...prev, [field]: fieldMessage }));
+          }
+        } else {
+          setErrorMessage("Nao foi possivel criar o treinamento. Verifique a API.");
+        }
+      },
+    });
   };
 
-  const handleSubmit = async () => {
-    const newTraining = await saveTraining();
-
-    if (!newTraining) {
-      return;
-    }
-
-    navigate("/painel/gerenciar-treinamentos");
+  const handleSubmit = () => {
+    scheduleTrainingCreation("list");
   };
 
-  const buildFormsNavigationState = (newTraining: ApiTraining) => ({
+  const buildFormsNavigationState = (
+    newTraining: ApiTraining,
+    coverImageName: string | null,
+  ) => ({
     id: newTraining.idTraining,
     title: newTraining.title,
     hours: newTraining.workload,
@@ -115,19 +155,11 @@ export default function CriarTreinamento() {
     progress: 0,
     daysLeft: 0,
     status: "em_andamento",
-    coverImageName: trainingImage?.name ?? null,
+    coverImageName,
   });
 
-  const handleSubmitAndCreateForms = async () => {
-    const newTraining = await saveTraining();
-
-    if (!newTraining) {
-      return;
-    }
-
-    navigate("/painel/gerenciar-treinamentos/novo-treinamento/formularios", {
-      state: { trainingDraft: buildFormsNavigationState(newTraining) },
-    });
+  const handleSubmitAndCreateForms = () => {
+    scheduleTrainingCreation("forms");
   };
 
   return (
@@ -139,6 +171,7 @@ export default function CriarTreinamento() {
           fieldErrors={fieldErrors}
           selectedImageName={trainingImage?.name}
           onImageChange={setTrainingImage}
+          isDisabled={isSaving}
         />
 
         <div className="rounded-md border border-primary-100 bg-white p-5 shadow-sm">

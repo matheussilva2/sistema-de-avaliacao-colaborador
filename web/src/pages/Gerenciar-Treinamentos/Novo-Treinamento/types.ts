@@ -2,12 +2,14 @@ export type TestType = "pre-teste" | "pos-teste";
 
 export type Option = {
   id: string;
+  persistedId?: string;
   text: string;
   isCorrect: boolean;
 };
 
 export type Question = {
   id: string;
+  persistedId?: string;
   title: string;
   options: Option[];
 };

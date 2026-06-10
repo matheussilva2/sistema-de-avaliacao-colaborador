@@ -8,10 +8,12 @@ export const SESSION_TIMEOUT_MS = 7 * 60 * 1000;
 
 export class ApiRequestError extends Error {
   status: number;
+  fieldErrors: Record<string, string>;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, fieldErrors: Record<string, string> = {}) {
     super(message);
     this.status = status;
+    this.fieldErrors = fieldErrors;
   }
 }
 
@@ -65,6 +67,7 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
     throw new ApiRequestError(
       errorMessage || "Nao foi possivel concluir a requisicao.",
       response.status,
+      parseFieldErrors(errorMessage),
     );
   }
 
@@ -201,4 +204,28 @@ export function isSessionExpired() {
 
 function markSessionActivity() {
   localStorage.setItem(AUTH_LAST_ACTIVITY_KEY, String(Date.now()));
+}
+
+function parseFieldErrors(responseText: string) {
+  if (!responseText) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(responseText) as unknown;
+
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+
+    return Object.entries(parsed).reduce<Record<string, string>>((errors, [field, message]) => {
+      if (typeof message === "string") {
+        errors[field] = message;
+      }
+
+      return errors;
+    }, {});
+  } catch {
+    return {};
+  }
 }

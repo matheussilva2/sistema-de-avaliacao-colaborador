@@ -1,27 +1,24 @@
 import { Button, Skeleton } from "@heroui/react";
-import { Search, Trash2, Undo2, X } from "lucide-react";
+import { Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getEmployeesByManager } from "../../services/userService";
+import { deleteUser, getEmployeesByManager } from "../../services/userService";
 import { getAuthenticatedUser, type ApiUser } from "../../services/authService";
 import {
   getTrashedEmployeeIds,
   moveEmployeeToTrash,
+  removeEmployeeFromTrash,
   restoreEmployeeFromTrash,
 } from "../../services/employeeTrashService";
-
-type PendingUndo = {
-  managerId: string;
-  user: ApiUser;
-};
+import { useUndoableDelete } from "../../components/UndoDeleteProvider";
 
 export default function Colaboradores() {
   const [colaboradores, setColaboradores] = useState<ApiUser[]>([]);
   const [managerId, setManagerId] = useState("");
-  const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const { scheduleUndoableDelete } = useUndoableDelete();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -50,18 +47,6 @@ export default function Colaboradores() {
     loadUsers();
   }, []);
 
-  useEffect(() => {
-    if (!pendingUndo) {
-      return;
-    }
-
-    const undoTimer = window.setTimeout(() => {
-      setPendingUndo(null);
-    }, 5000);
-
-    return () => window.clearTimeout(undoTimer);
-  }, [pendingUndo]);
-
   const filtrados = useMemo(() => {
     return colaboradores.filter((user) => {
       const fullName = `${user.name} ${user.lastName}`.toLowerCase();
@@ -79,21 +64,28 @@ export default function Colaboradores() {
       return;
     }
 
-    moveEmployeeToTrash(managerId, user);
-    setColaboradores((prev) => prev.filter((item) => item.id !== user.id));
-    setPendingUndo({ managerId, user });
-  };
-
-  const handleUndoDelete = () => {
-    if (!pendingUndo) {
-      return;
-    }
-
-    restoreEmployeeFromTrash(pendingUndo.managerId, pendingUndo.user.id);
-    setColaboradores((prev) =>
-      [...prev, pendingUndo.user].sort(compareUsersByName),
-    );
-    setPendingUndo(null);
+    scheduleUndoableDelete({
+      id: `employee:${user.id}`,
+      title: "Colaborador removido",
+      description: `${user.name} ${user.lastName} sera excluido definitivamente em 5 segundos.`,
+      onStart: () => {
+        moveEmployeeToTrash(managerId, user);
+        setColaboradores((prev) => prev.filter((item) => item.id !== user.id));
+      },
+      onUndo: () => {
+        restoreEmployeeFromTrash(managerId, user.id);
+        setColaboradores((prev) => [...prev, user].sort(compareUsersByName));
+      },
+      onCommit: async () => {
+        await deleteUser(user.id);
+        removeEmployeeFromTrash(managerId, user.id);
+      },
+      onCommitError: () => {
+        restoreEmployeeFromTrash(managerId, user.id);
+        setColaboradores((prev) => [...prev, user].sort(compareUsersByName));
+        setErrorMessage("Nao foi possivel excluir definitivamente este colaborador.");
+      },
+    });
   };
 
   return (
@@ -202,41 +194,6 @@ export default function Colaboradores() {
           </div>
         )}
       </div>
-
-      {pendingUndo && (
-        <div className="fixed bottom-6 right-6 z-50 w-[min(420px,calc(100vw-3rem))] rounded-md border border-gray-200 bg-white p-4 shadow-xl">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="font-semibold text-neutral-900">
-                Colaborador movido para a lixeira
-              </p>
-              <p className="mt-1 text-sm text-neutral-600">
-                {pendingUndo.user.name} {pendingUndo.user.lastName} sera mantido na
-                lixeira ate a exclusao definitiva.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setPendingUndo(null)}
-              className="rounded-md p-1 text-neutral-500 transition hover:bg-gray-100 hover:text-neutral-900"
-              aria-label="Fechar aviso"
-            >
-              <X size={18} />
-            </button>
-          </div>
-
-          <div className="mt-4 flex justify-end">
-            <Button
-              className="bg-primary text-white"
-              onPress={handleUndoDelete}
-            >
-              <Undo2 size={16} />
-              Desfazer
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

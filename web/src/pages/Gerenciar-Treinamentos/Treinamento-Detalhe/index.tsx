@@ -26,10 +26,12 @@ import {
   clearFormTrash,
   getTrashedFormIds,
   getTrashedForms,
+  moveFormToTrash,
   removeFormFromTrash,
   restoreFormFromTrash,
   type TrashedForm,
 } from "../../../services/formTrashService";
+import { useUndoableDelete } from "../../../components/UndoDeleteProvider";
 
 type TrainingFormSummary = ApiForm & {
   questionCount: number;
@@ -59,6 +61,7 @@ export default function TreinamentoDetalhes() {
   const [showStudentsList, setShowStudentsList] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const { scheduleUndoableDelete } = useUndoableDelete();
   const [form, setForm] = useState({
     title: "",
     workload: "",
@@ -200,7 +203,13 @@ export default function TreinamentoDetalhes() {
     }
   };
 
-  const handleDeleteFormForever = async (formId: string) => {
+  const handleDeleteFormForever = (formId: string) => {
+    const trashedForm = trashedForms.find((item) => item.form.idForm === formId);
+
+    if (!trashedForm) {
+      return;
+    }
+
     const hasAnswers = trainingResults.some((answer) => answer.form.idForm === formId);
 
     if (hasAnswers) {
@@ -209,16 +218,30 @@ export default function TreinamentoDetalhes() {
       return;
     }
 
-    try {
-      await deleteTrainingForm(formId);
-      setTrashedForms(removeFormFromTrash(training.idTraining, formId));
-    } catch {
-      setErrorMessage("Nao foi possivel excluir definitivamente o formulario.");
-      setSuccessMessage("");
-    }
+    scheduleUndoableDelete({
+      id: `form-trash:${formId}`,
+      title: "Formulario excluido",
+      description: `${trashedForm.form.title} sera excluido definitivamente em 5 segundos.`,
+      onStart: () => {
+        setTrashedForms(removeFormFromTrash(training.idTraining, formId));
+        setErrorMessage("");
+        setSuccessMessage("");
+      },
+      onUndo: () => {
+        setTrashedForms(moveFormToTrash(training.idTraining, trashedForm.form));
+      },
+      onCommit: async () => {
+        await deleteTrainingForm(formId);
+      },
+      onCommitError: () => {
+        setTrashedForms(moveFormToTrash(training.idTraining, trashedForm.form));
+        setErrorMessage("Nao foi possivel excluir definitivamente o formulario.");
+        setSuccessMessage("");
+      },
+    });
   };
 
-  const handleEmptyFormsTrash = async () => {
+  const handleEmptyFormsTrash = () => {
     const formsWithAnswers = new Set(trainingResults.map((answer) => answer.form.idForm));
     const blockedForms = trashedForms.filter((item) =>
       formsWithAnswers.has(item.form.idForm),
@@ -230,14 +253,38 @@ export default function TreinamentoDetalhes() {
       return;
     }
 
-    try {
-      await Promise.all(trashedForms.map((item) => deleteTrainingForm(item.form.idForm)));
-      clearFormTrash(training.idTraining);
-      setTrashedForms([]);
-    } catch {
-      setErrorMessage("Nao foi possivel esvaziar toda a lixeira de formularios.");
-      setSuccessMessage("");
-    }
+    const trashSnapshot = [...trashedForms];
+
+    scheduleUndoableDelete({
+      id: `form-trash:empty:${training.idTraining}`,
+      title: "Lixeira de formularios esvaziada",
+      description: `${trashSnapshot.length} formulario(s) serao excluidos definitivamente em 5 segundos.`,
+      onStart: () => {
+        clearFormTrash(training.idTraining);
+        setTrashedForms([]);
+        setErrorMessage("");
+        setSuccessMessage("");
+      },
+      onUndo: () => {
+        trashSnapshot
+          .slice()
+          .reverse()
+          .forEach((item) => moveFormToTrash(training.idTraining, item.form));
+        setTrashedForms(trashSnapshot);
+      },
+      onCommit: async () => {
+        await Promise.all(trashSnapshot.map((item) => deleteTrainingForm(item.form.idForm)));
+      },
+      onCommitError: () => {
+        trashSnapshot
+          .slice()
+          .reverse()
+          .forEach((item) => moveFormToTrash(training.idTraining, item.form));
+        setTrashedForms(trashSnapshot);
+        setErrorMessage("Nao foi possivel esvaziar toda a lixeira de formularios.");
+        setSuccessMessage("");
+      },
+    });
   };
 
   return (

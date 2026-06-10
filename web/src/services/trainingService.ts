@@ -61,6 +61,12 @@ export function updateTrainingImage(trainingId: string, trainingImage: string) {
   });
 }
 
+export function deleteTraining(trainingId: string) {
+  return request<string>(`/trainings/${trainingId}`, {
+    method: "DELETE",
+  });
+}
+
 export function getTrainingUsers(trainingId: string) {
   return request<ApiUser[]>(`/trainings/${trainingId}/users`, {
     method: "GET",

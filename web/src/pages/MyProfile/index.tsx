@@ -10,8 +10,10 @@ import {
   type ApiUserRole,
 } from "../../services/authService";
 import { updateUser, updateUserPhoto } from "../../services/userService";
+import { useUndoableAction } from "../../components/UndoDeleteProvider";
 
 export const MyProfile = () => {
+  const { scheduleUndoableAction } = useUndoableAction();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -121,46 +123,96 @@ export const MyProfile = () => {
       return;
     }
 
-    try {
-      const updatedUser = await updateUser(loggedUser.id, {
-        name: form.name,
-        lastName: form.lastName,
-        email: form.email,
-        phone: form.phone,
-        cpf: form.cpf,
-        userRole: form.userRole,
-        active: form.active,
-        passWord: form.passWord || undefined,
-        hireDate: form.hireDate,
-        registrationDate: form.registrationDate,
-      });
+    const previousUser = loggedUser;
+    const previousForm = { ...form };
+    const payload = {
+      name: form.name,
+      lastName: form.lastName,
+      email: form.email,
+      phone: form.phone,
+      cpf: form.cpf,
+      userRole: form.userRole,
+      active: form.active,
+      passWord: form.passWord || undefined,
+      hireDate: form.hireDate,
+      registrationDate: form.registrationDate,
+    };
+    const optimisticUser: ApiUser = {
+      ...loggedUser,
+      name: form.name,
+      lastName: form.lastName,
+      email: form.email,
+      phone: form.phone,
+      cpf: form.cpf,
+      userRole: form.userRole,
+      active: form.active,
+      hireDate: form.hireDate,
+      registrationDate: form.registrationDate,
+    };
+    const optimisticForm = {
+      ...form,
+      passWord: "",
+      confirmPassword: "",
+    };
 
-      saveAuthenticatedUser(updatedUser);
-      setLoggedUser(updatedUser);
-      setForm((prev) => ({
-        ...prev,
-        cpf: formatCpf(updatedUser.cpf),
-        passWord: "",
-        confirmPassword: "",
-        hireDate: updatedUser.hireDate ?? prev.hireDate,
-        registrationDate: updatedUser.registrationDate ?? prev.registrationDate,
-      }));
-      setIsEditing(false);
-      setSuccessMessage("Perfil atualizado com sucesso.");
-    } catch (error) {
-      if (error instanceof ApiRequestError && error.status === 409) {
-        const conflict = getProfileConflictMessage(error.message);
-        setErrorMessage(conflict.global);
-        setFieldErrors((prev) => ({
-          ...prev,
-          [conflict.field]: conflict.fieldMessage,
-        }));
-      } else {
-        setErrorMessage("Nao foi possivel salvar o perfil. Confira os dados.");
-      }
-    } finally {
-      setIsSaving(false);
-    }
+    scheduleUndoableAction({
+      id: `profile:update:${loggedUser.id}`,
+      title: "Alteracoes no perfil",
+      description: "Os dados do perfil serao salvos em 5 segundos.",
+      onStart: () => {
+        saveAuthenticatedUser(optimisticUser);
+        setLoggedUser(optimisticUser);
+        setForm(optimisticForm);
+        setFieldErrors({});
+        setIsEditing(false);
+        setSuccessMessage("Alteracoes aplicadas na tela. Voce pode desfazer antes de salvar.");
+      },
+      onUndo: () => {
+        saveAuthenticatedUser(previousUser);
+        setLoggedUser(previousUser);
+        setForm(previousForm);
+        setIsEditing(true);
+        setIsSaving(false);
+        setSuccessMessage("");
+      },
+      onCommit: async () => {
+        try {
+          const updatedUser = await updateUser(loggedUser.id, payload);
+
+          saveAuthenticatedUser(updatedUser);
+          setLoggedUser(updatedUser);
+          setForm((prev) => ({
+            ...prev,
+            cpf: formatCpf(updatedUser.cpf),
+            passWord: "",
+            confirmPassword: "",
+            hireDate: updatedUser.hireDate ?? prev.hireDate,
+            registrationDate: updatedUser.registrationDate ?? prev.registrationDate,
+          }));
+          setSuccessMessage("Perfil atualizado com sucesso.");
+        } finally {
+          setIsSaving(false);
+        }
+      },
+      onCommitError: (error) => {
+        saveAuthenticatedUser(previousUser);
+        setLoggedUser(previousUser);
+        setForm(previousForm);
+        setIsEditing(true);
+        setSuccessMessage("");
+
+        if (error instanceof ApiRequestError && error.status === 409) {
+          const conflict = getProfileConflictMessage(error.message);
+          setErrorMessage(conflict.global);
+          setFieldErrors((prev) => ({
+            ...prev,
+            [conflict.field]: conflict.fieldMessage,
+          }));
+        } else {
+          setErrorMessage("Nao foi possivel salvar o perfil. Confira os dados.");
+        }
+      },
+    });
   };
 
   const isEmployee = form.userRole === "EMPLOYEE";
@@ -359,13 +411,14 @@ export const MyProfile = () => {
                   <Button
                     type="button"
                     className="w-full bg-primary text-white"
+                    isDisabled={isSaving}
                     onPress={() => {
                       setIsEditing(true);
                       setSuccessMessage("");
                       setErrorMessage("");
                     }}
                   >
-                    Editar Dados
+                    {isSaving ? "Aguardando..." : "Editar Dados"}
                   </Button>
                 ) : (
                   <>
