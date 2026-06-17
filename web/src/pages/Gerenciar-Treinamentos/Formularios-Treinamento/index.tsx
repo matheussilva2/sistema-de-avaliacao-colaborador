@@ -27,10 +27,16 @@ import {
 import { useUndoableDelete } from "../../../components/UndoDeleteProvider";
 import {
   DATE_INPUT_PLACEHOLDER,
+  DEFAULT_END_TIME,
+  DEFAULT_START_TIME,
+  TIME_INPUT_PLACEHOLDER,
   formatDateForDisplay,
+  formatTimeForDisplay,
   formatDateInput,
   isCompleteDateValue,
+  isCompleteTimeValue,
   parseDateValue,
+  parseTimeValue,
 } from "../../../utils/dateUtils";
 
 type ManagedTrainingForm = {
@@ -41,6 +47,8 @@ type ManagedTrainingForm = {
   type: TestType;
   startDeadline: string;
   endDeadline: string;
+  startTime: string;
+  endTime: string;
   minCorrect: string;
   questions: Question[];
 };
@@ -66,6 +74,8 @@ const createEmptyForm = (
   type,
   startDeadline: "",
   endDeadline: "",
+  startTime: DEFAULT_START_TIME,
+  endTime: DEFAULT_END_TIME,
   minCorrect: "70",
   questions: [],
 });
@@ -436,7 +446,13 @@ export default function FormulariosTreinamento() {
 
     try {
       for (const form of forms) {
-        if (!form.title || !form.startDeadline || !form.endDeadline) {
+        if (
+          !form.title ||
+          !form.startDeadline ||
+          !form.endDeadline ||
+          !form.startTime ||
+          !form.endTime
+        ) {
           throw new Error("Campos obrigatorios ausentes.");
         }
 
@@ -449,11 +465,21 @@ export default function FormulariosTreinamento() {
           throw new Error("Datas invalidas.");
         }
 
+        if (
+          !isCompleteTimeValue(form.startTime) ||
+          !isCompleteTimeValue(form.endTime) ||
+          !isAvailabilityWindowValid(form)
+        ) {
+          throw new Error("Horarios invalidos.");
+        }
+
         const payload = {
           title: form.title,
           formType: mapTestTypeToApi(form.type),
           initDate: formatDateForDisplay(form.startDeadline),
           endDate: formatDateForDisplay(form.endDeadline),
+          initTime: formatTimeForDisplay(form.startTime),
+          endTime: formatTimeForDisplay(form.endTime),
           minCorrectPercentage: Number(form.minCorrect),
         };
 
@@ -570,10 +596,10 @@ export default function FormulariosTreinamento() {
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium text-neutral-700">
-                    Prazo de inicio
+                    Data de inicio
                   </label>
                   <Input
                     value={form.startDeadline}
@@ -588,7 +614,21 @@ export default function FormulariosTreinamento() {
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium text-neutral-700">
-                    Prazo final
+                    Horario de inicio
+                  </label>
+                  <Input
+                    type="time"
+                    value={form.startTime}
+                    onChange={(event) =>
+                      updateForm(form.id, "startTime", event.target.value)
+                    }
+                    placeholder={TIME_INPUT_PLACEHOLDER}
+                    readOnly={isLockedByAnswers}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-neutral-700">
+                    Data final
                   </label>
                   <Input
                     value={form.endDeadline}
@@ -598,6 +638,20 @@ export default function FormulariosTreinamento() {
                     inputMode="numeric"
                     maxLength={10}
                     placeholder={DATE_INPUT_PLACEHOLDER}
+                    readOnly={isLockedByAnswers}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-neutral-700">
+                    Horario final
+                  </label>
+                  <Input
+                    type="time"
+                    value={form.endTime}
+                    onChange={(event) =>
+                      updateForm(form.id, "endTime", event.target.value)
+                    }
+                    placeholder={TIME_INPUT_PLACEHOLDER}
                     readOnly={isLockedByAnswers}
                   />
                 </div>
@@ -785,6 +839,8 @@ async function hydrateForm(trainingId: string, form: ApiForm): Promise<ManagedTr
     type: mapApiFormType(form.formType),
     startDeadline: formatDateForDisplay(form.initDate),
     endDeadline: formatDateForDisplay(form.endDate),
+    startTime: formatTimeForDisplay(form.initTime) || DEFAULT_START_TIME,
+    endTime: formatTimeForDisplay(form.endTime) || DEFAULT_END_TIME,
     minCorrect: String(form.minCorrectPercentage),
     questions: hydratedQuestions,
   };
@@ -797,6 +853,36 @@ function mapManagedFormToApiForm(form: ManagedTrainingForm): ApiForm {
     formType: mapTestTypeToApi(form.type),
     initDate: formatDateForDisplay(form.startDeadline),
     endDate: formatDateForDisplay(form.endDeadline),
+    initTime: formatTimeForDisplay(form.startTime) || DEFAULT_START_TIME,
+    endTime: formatTimeForDisplay(form.endTime) || DEFAULT_END_TIME,
     minCorrectPercentage: Number(form.minCorrect),
   };
+}
+
+function isAvailabilityWindowValid(form: ManagedTrainingForm) {
+  const startDate = parseDateValue(form.startDeadline);
+  const endDate = parseDateValue(form.endDeadline);
+  const startTime = parseTimeValue(form.startTime);
+  const endTime = parseTimeValue(form.endTime);
+
+  if (!startDate || !endDate || !startTime || !endTime) {
+    return false;
+  }
+
+  const start = new Date(
+    startDate.getFullYear(),
+    startDate.getMonth(),
+    startDate.getDate(),
+    startTime.hours,
+    startTime.minutes,
+  );
+  const end = new Date(
+    endDate.getFullYear(),
+    endDate.getMonth(),
+    endDate.getDate(),
+    endTime.hours,
+    endTime.minutes,
+  );
+
+  return end >= start;
 }

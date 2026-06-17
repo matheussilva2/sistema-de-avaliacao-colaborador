@@ -7,6 +7,8 @@ export type ManagedTrainingForm = {
   type: TestType;
   startDeadline: string;
   endDeadline: string;
+  startTime: string;
+  endTime: string;
   minCorrect: string;
   questions: Question[];
 };
@@ -33,6 +35,8 @@ export const managedTrainingFormsMock: ManagedTrainingForm[] = [
     type: "pre-teste",
     startDeadline: "10/05/2026",
     endDeadline: "18/05/2026",
+    startTime: "08:00",
+    endTime: "18:00",
     minCorrect: "50",
     questions: [
       {
@@ -76,6 +80,8 @@ export const managedTrainingFormsMock: ManagedTrainingForm[] = [
     type: "pos-teste",
     startDeadline: "20/06/2026",
     endDeadline: "30/06/2026",
+    startTime: "08:00",
+    endTime: "18:00",
     minCorrect: "70",
     questions: [
       {

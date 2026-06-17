@@ -35,6 +35,7 @@ import { useUndoableDelete } from "../../../components/UndoDeleteProvider";
 import {
   DATE_INPUT_PLACEHOLDER,
   formatDateForDisplay,
+  formatDateTimeForDisplay,
   formatDateInput,
   isCompleteDateValue,
   parseDateValue,
@@ -849,13 +850,13 @@ function FormListGroup({
                 <div>
                   <span>Inicio</span>
                   <p className="font-semibold text-neutral-900">
-                    {formatDateForDisplay(form.initDate)}
+                    {formatDateTimeForDisplay(form.initDate, form.initTime, "00:00")}
                   </p>
                 </div>
                 <div>
                   <span>Termino</span>
                   <p className="font-semibold text-neutral-900">
-                    {formatDateForDisplay(form.endDate)}
+                    {formatDateTimeForDisplay(form.endDate, form.endTime, "23:59")}
                   </p>
                 </div>
                 <div>

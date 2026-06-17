@@ -8,6 +8,8 @@ export type ApiForm = {
   formType: ApiFormType;
   initDate: string;
   endDate: string;
+  initTime?: string | null;
+  endTime?: string | null;
   minCorrectPercentage: number;
 };
 
@@ -54,6 +56,8 @@ export type FormPayload = {
   formType: ApiFormType;
   initDate: string;
   endDate: string;
+  initTime: string;
+  endTime: string;
   minCorrectPercentage: number;
 };
 

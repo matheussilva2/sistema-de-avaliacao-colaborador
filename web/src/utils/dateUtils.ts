@@ -1,4 +1,7 @@
 export const DATE_INPUT_PLACEHOLDER = "dd/mm/aaaa";
+export const TIME_INPUT_PLACEHOLDER = "hh:mm";
+export const DEFAULT_START_TIME = "00:00";
+export const DEFAULT_END_TIME = "23:59";
 
 export function formatDateInput(value: string) {
   const trimmedValue = value.trim();
@@ -57,6 +60,96 @@ export function isCompleteDateValue(value: string) {
   );
 }
 
+export function formatTimeForDisplay(value?: string | null) {
+  const time = parseTimeValue(value);
+
+  if (!time) {
+    return "";
+  }
+
+  return `${String(time.hours).padStart(2, "0")}:${String(time.minutes).padStart(2, "0")}`;
+}
+
+export function isCompleteTimeValue(value: string) {
+  return Boolean(parseTimeValue(value));
+}
+
+export function parseTimeValue(value?: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const match = /^(\d{2}):(\d{2})$/.exec(value.trim());
+
+  if (!match) {
+    return null;
+  }
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return null;
+  }
+
+  return { hours, minutes };
+}
+
+export function isNowInsideAvailabilityWindow(
+  initDate: string,
+  initTime: string | null | undefined,
+  endDate: string,
+  endTime: string | null | undefined,
+) {
+  const start = buildDateTime(initDate, initTime || DEFAULT_START_TIME);
+  const end = buildDateTime(endDate, endTime || DEFAULT_END_TIME, true);
+
+  if (!start || !end) {
+    return true;
+  }
+
+  const now = new Date();
+
+  return now >= start && now <= end;
+}
+
+export function getAvailabilityStatus(
+  initDate: string,
+  initTime: string | null | undefined,
+  endDate: string,
+  endTime: string | null | undefined,
+) {
+  const start = buildDateTime(initDate, initTime || DEFAULT_START_TIME);
+  const end = buildDateTime(endDate, endTime || DEFAULT_END_TIME, true);
+
+  if (!start || !end) {
+    return "available";
+  }
+
+  const now = new Date();
+
+  if (now < start) {
+    return "upcoming";
+  }
+
+  if (now > end) {
+    return "expired";
+  }
+
+  return "available";
+}
+
+export function formatDateTimeForDisplay(
+  date: string,
+  time?: string | null,
+  fallbackTime = "",
+) {
+  const dateText = formatDateForDisplay(date);
+  const timeText = formatTimeForDisplay(time) || fallbackTime;
+
+  return timeText ? `${dateText} ${timeText}` : dateText;
+}
+
 export function parseDateValue(value?: string | null) {
   if (!value) {
     return null;
@@ -107,6 +200,32 @@ function buildDate(year: number, month: number, day: number) {
   }
 
   return date;
+}
+
+function buildDateTime(dateValue: string, timeValue: string, includeEntireMinute = false) {
+  const date = parseDateValue(dateValue);
+  const time = parseTimeValue(timeValue);
+
+  if (!date || !time) {
+    return null;
+  }
+
+  const dateTime = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    time.hours,
+    time.minutes,
+    0,
+    0,
+  );
+
+  if (includeEntireMinute) {
+    dateTime.setMinutes(dateTime.getMinutes() + 1);
+    dateTime.setMilliseconds(dateTime.getMilliseconds() - 1);
+  }
+
+  return dateTime;
 }
 
 function formatDateParts(year: number, month: number, day: number) {

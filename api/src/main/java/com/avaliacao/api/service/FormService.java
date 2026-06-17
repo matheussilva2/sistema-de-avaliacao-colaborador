@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 
 import java.time.DateTimeException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
@@ -21,6 +23,7 @@ import java.util.UUID;
 public class FormService {
 
     private static final DateTimeFormatter DISPLAY_DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final DateTimeFormatter DISPLAY_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
 
     private final FormRepository formRepository;
     private final TrainingRepository trainingRepository;
@@ -95,6 +98,8 @@ public class FormService {
         var errors = new LinkedHashMap<String, String>();
         var initDate = parseDate(formRecordDTO.initDate());
         var endDate = parseDate(formRecordDTO.endDate());
+        var initTime = parseTime(formRecordDTO.initTime());
+        var endTime = parseTime(formRecordDTO.endTime());
 
         if(initDate == null){
             errors.put("initDate", "Data de inicio invalida");
@@ -104,8 +109,24 @@ public class FormService {
             errors.put("endDate", "Data de termino invalida");
         }
 
+        if(initTime == null){
+            errors.put("initTime", "Horario de inicio invalido");
+        }
+
+        if(endTime == null){
+            errors.put("endTime", "Horario de termino invalido");
+        }
+
         if(initDate != null && endDate != null && endDate.isBefore(initDate)){
             errors.put("endDate", "Data de termino deve ser posterior ou igual a data de inicio");
+        }
+
+        if(initDate != null &&
+                endDate != null &&
+                initTime != null &&
+                endTime != null &&
+                LocalDateTime.of(endDate, endTime).isBefore(LocalDateTime.of(initDate, initTime))){
+            errors.put("endTime", "Horario de termino deve ser posterior ou igual ao inicio da disponibilidade");
         }
 
         if(!errors.isEmpty()){
@@ -117,10 +138,16 @@ public class FormService {
         form.setTitle(formRecordDTO.title().trim());
         form.setInitDate(normalizeDate(formRecordDTO.initDate()));
         form.setEndDate(normalizeDate(formRecordDTO.endDate()));
+        form.setInitTime(normalizeTime(formRecordDTO.initTime()));
+        form.setEndTime(normalizeTime(formRecordDTO.endTime()));
     }
 
     private String normalizeDate(String value){
         return parseDate(value).format(DISPLAY_DATE_FORMATTER);
+    }
+
+    private String normalizeTime(String value){
+        return parseTime(value).format(DISPLAY_TIME_FORMATTER);
     }
 
     private LocalDate parseDate(String value){
@@ -149,6 +176,19 @@ public class FormService {
                         Integer.parseInt(parts[0]));
             } catch (DateTimeException | NumberFormatException ignored) {
             }
+        }
+
+        return null;
+    }
+
+    private LocalTime parseTime(String value){
+        if(value == null || value.isBlank()){
+            return null;
+        }
+
+        try {
+            return LocalTime.parse(value.trim(), DISPLAY_TIME_FORMATTER);
+        } catch (DateTimeParseException ignored) {
         }
 
         return null;

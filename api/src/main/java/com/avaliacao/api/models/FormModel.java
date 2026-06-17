@@ -23,6 +23,8 @@ public class FormModel implements Serializable {
 
     private String initDate;
     private String endDate;
+    private String initTime;
+    private String endTime;
     private int minCorrectPercentage;
 
     @JsonIgnore
@@ -68,6 +70,22 @@ public class FormModel implements Serializable {
 
     public void setEndDate(String endDate) {
         this.endDate = endDate;
+    }
+
+    public String getInitTime() {
+        return initTime;
+    }
+
+    public void setInitTime(String initTime) {
+        this.initTime = initTime;
+    }
+
+    public String getEndTime() {
+        return endTime;
+    }
+
+    public void setEndTime(String endTime) {
+        this.endTime = endTime;
     }
 
     public int getMinCorrectPercentage() {
