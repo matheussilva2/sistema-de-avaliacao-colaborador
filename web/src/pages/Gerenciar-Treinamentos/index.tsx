@@ -12,6 +12,7 @@ import {
   writeTrainingsCache,
 } from "../../services/trainingService";
 import { useUndoableDelete } from "../../components/UndoDeleteProvider";
+import { formatDateForDisplay, parseDateValue } from "../../utils/dateUtils";
 
 type StatusFilter = "todos" | "em_andamento" | "concluido" | "oculto";
 
@@ -275,13 +276,13 @@ export const GerenciarTreinamentos = () => {
                     <div className="flex items-center gap-2 text-sm">
                       <CalendarDays size={16} />
                       <span>
-                        <strong>Inicio:</strong> {training.initDate}
+                        <strong>Inicio:</strong> {formatDateForDisplay(training.initDate)}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       <CalendarDays size={16} />
                       <span>
-                        <strong>Termino:</strong> {training.endDate}
+                        <strong>Termino:</strong> {formatDateForDisplay(training.endDate)}
                       </span>
                     </div>
                   </div>
@@ -347,9 +348,9 @@ function isTrainingConcluded(endDate: string) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const trainingEndDate = new Date(`${endDate}T00:00:00`);
+  const trainingEndDate = parseDateValue(endDate);
 
-  if (Number.isNaN(trainingEndDate.getTime())) {
+  if (!trainingEndDate) {
     return false;
   }
 

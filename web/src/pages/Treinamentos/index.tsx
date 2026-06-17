@@ -16,6 +16,7 @@ import {
   type ApiFormAnswer,
 } from "../../services/formService";
 import { getTrashedFormIds } from "../../services/formTrashService";
+import { formatDateForDisplay, parseDateValue } from "../../utils/dateUtils";
 
 type StatusFilter = "todos" | "em_andamento" | "concluido" | "oculto";
 const hiddenStudentTrainingsKey = "hiddenStudentTrainings";
@@ -274,11 +275,11 @@ export const Treinamentos = () => {
                   <div className="flex flex-col gap-2 text-sm text-neutral-600">
                     <span className="flex items-center gap-2">
                       <CalendarDays size={16} />
-                      <strong>Inicio:</strong> {training.initDate}
+                      <strong>Inicio:</strong> {formatDateForDisplay(training.initDate)}
                     </span>
                     <span className="flex items-center gap-2">
                       <CalendarDays size={16} />
-                      <strong>Termino:</strong> {training.endDate}
+                      <strong>Termino:</strong> {formatDateForDisplay(training.endDate)}
                     </span>
                   </div>
 
@@ -353,9 +354,9 @@ function isTrainingConcluded(endDate: string) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const trainingEndDate = new Date(`${endDate}T00:00:00`);
+  const trainingEndDate = parseDateValue(endDate);
 
-  if (Number.isNaN(trainingEndDate.getTime())) {
+  if (!trainingEndDate) {
     return false;
   }
 

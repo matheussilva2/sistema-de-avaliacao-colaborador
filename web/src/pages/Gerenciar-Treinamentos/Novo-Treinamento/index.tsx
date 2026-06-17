@@ -10,6 +10,12 @@ import {
   updateTrainingImage,
 } from "../../../services/trainingService";
 import { useUndoableAction } from "../../../components/UndoDeleteProvider";
+import {
+  formatDateForDisplay,
+  formatDateInput,
+  isCompleteDateValue,
+  parseDateValue,
+} from "../../../utils/dateUtils";
 
 export default function CriarTreinamento() {
   const navigate = useNavigate();
@@ -28,9 +34,12 @@ export default function CriarTreinamento() {
   });
 
   const handleChange = (field: keyof TrainingFormData, value: string) => {
+    const nextValue =
+      field === "startDate" || field === "endDate" ? formatDateInput(value) : value;
+
     setForm((prev) => ({
       ...prev,
-      [field]: value,
+      [field]: nextValue,
     }));
     setFieldErrors((prev) => ({ ...prev, [field]: "" }));
   };
@@ -149,8 +158,8 @@ export default function CriarTreinamento() {
     id: newTraining.idTraining,
     title: newTraining.title,
     hours: newTraining.workload,
-    startDate: newTraining.initDate,
-    endDate: newTraining.endDate,
+    startDate: formatDateForDisplay(newTraining.initDate),
+    endDate: formatDateForDisplay(newTraining.endDate),
     description: newTraining.description,
     progress: 0,
     daysLeft: 0,
@@ -235,8 +244,8 @@ function normalizeTrainingForm(form: TrainingFormData): TrainingFormData {
   return {
     title: form.title.trim(),
     hours: form.hours.trim(),
-    startDate: form.startDate.trim(),
-    endDate: form.endDate.trim(),
+    startDate: formatDateForDisplay(form.startDate.trim()),
+    endDate: formatDateForDisplay(form.endDate.trim()),
     description: form.description.trim(),
   };
 }
@@ -244,8 +253,8 @@ function normalizeTrainingForm(form: TrainingFormData): TrainingFormData {
 function validateTrainingForm(form: TrainingFormData) {
   const errors: TrainingFieldErrors = {};
   const workload = Number(form.hours);
-  const startDate = parseDate(form.startDate);
-  const endDate = parseDate(form.endDate);
+  const startDate = parseDateValue(form.startDate);
+  const endDate = parseDateValue(form.endDate);
 
   if (!form.title) {
     errors.title = "Informe o titulo do treinamento.";
@@ -261,13 +270,13 @@ function validateTrainingForm(form: TrainingFormData) {
 
   if (!form.startDate) {
     errors.startDate = "Informe a data de inicio.";
-  } else if (!startDate) {
+  } else if (!isCompleteDateValue(form.startDate) || !startDate) {
     errors.startDate = "Informe uma data de inicio valida.";
   }
 
   if (!form.endDate) {
     errors.endDate = "Informe a data de termino.";
-  } else if (!endDate) {
+  } else if (!isCompleteDateValue(form.endDate) || !endDate) {
     errors.endDate = "Informe uma data de termino valida.";
   }
 
@@ -280,15 +289,6 @@ function validateTrainingForm(form: TrainingFormData) {
   }
 
   return errors;
-}
-
-function parseDate(value: string) {
-  if (!value) {
-    return null;
-  }
-
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function getCreateTrainingErrorMessage(message: string): {

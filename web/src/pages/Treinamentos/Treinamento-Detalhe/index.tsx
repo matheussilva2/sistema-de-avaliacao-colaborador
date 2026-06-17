@@ -12,6 +12,7 @@ import {
   type ApiFormType,
 } from "../../../services/formService";
 import { getTrashedFormIds } from "../../../services/formTrashService";
+import { formatDateForDisplay } from "../../../utils/dateUtils";
 
 const recentTrainingsKeyPrefix = "recentTrainings";
 
@@ -122,12 +123,12 @@ export default function TreinamentoAluno() {
 
             <div className="bg-primary-50 p-4 rounded-md">
               <span className="text-sm text-neutral-600">Inicio</span>
-              <p className="font-bold text-lg">{training.initDate}</p>
+              <p className="font-bold text-lg">{formatDateForDisplay(training.initDate)}</p>
             </div>
 
             <div className="bg-primary-50 p-4 rounded-md">
               <span className="text-sm text-neutral-600">Termino</span>
-              <p className="font-bold text-lg">{training.endDate}</p>
+              <p className="font-bold text-lg">{formatDateForDisplay(training.endDate)}</p>
             </div>
           </div>
 
@@ -195,11 +196,15 @@ function FormsList({
               <div className="mt-4 grid gap-3 text-sm text-neutral-600 md:grid-cols-3">
                 <div>
                   <span>Inicio</span>
-                  <p className="font-semibold text-neutral-900">{form.initDate}</p>
+                  <p className="font-semibold text-neutral-900">
+                    {formatDateForDisplay(form.initDate)}
+                  </p>
                 </div>
                 <div>
                   <span>Prazo final</span>
-                  <p className="font-semibold text-neutral-900">{form.endDate}</p>
+                  <p className="font-semibold text-neutral-900">
+                    {formatDateForDisplay(form.endDate)}
+                  </p>
                 </div>
                 <div>
                   <span>Minimo</span>

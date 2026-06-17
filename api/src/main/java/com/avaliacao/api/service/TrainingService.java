@@ -26,6 +26,8 @@ import java.util.UUID;
 @Service
 public class TrainingService {
 
+    private static final DateTimeFormatter DISPLAY_DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
     private final TrainingRepository trainingRepository;
     private final UserRepository userRepository;
     private final FormAnswerRepository formAnswerRepository;
@@ -207,9 +209,13 @@ public class TrainingService {
 
     private void applyNormalizedFields(TrainingModel training, TrainingRecordDTO trainingRecordDTO){
         training.setTitle(trainingRecordDTO.title().trim());
-        training.setInitDate(trainingRecordDTO.initDate().trim());
-        training.setEndDate(trainingRecordDTO.endDate().trim());
+        training.setInitDate(normalizeDate(trainingRecordDTO.initDate()));
+        training.setEndDate(normalizeDate(trainingRecordDTO.endDate()));
         training.setDescription(trainingRecordDTO.description().trim());
+    }
+
+    private String normalizeDate(String value){
+        return parseDate(value).format(DISPLAY_DATE_FORMATTER);
     }
 
     private LocalDate parseDate(String value){

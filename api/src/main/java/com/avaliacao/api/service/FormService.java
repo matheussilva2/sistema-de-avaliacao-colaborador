@@ -20,6 +20,8 @@ import java.util.UUID;
 @Service
 public class FormService {
 
+    private static final DateTimeFormatter DISPLAY_DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
     private final FormRepository formRepository;
     private final TrainingRepository trainingRepository;
 
@@ -113,8 +115,12 @@ public class FormService {
 
     private void applyNormalizedFields(FormModel form, FormRecordDTO formRecordDTO){
         form.setTitle(formRecordDTO.title().trim());
-        form.setInitDate(formRecordDTO.initDate().trim());
-        form.setEndDate(formRecordDTO.endDate().trim());
+        form.setInitDate(normalizeDate(formRecordDTO.initDate()));
+        form.setEndDate(normalizeDate(formRecordDTO.endDate()));
+    }
+
+    private String normalizeDate(String value){
+        return parseDate(value).format(DISPLAY_DATE_FORMATTER);
     }
 
     private LocalDate parseDate(String value){

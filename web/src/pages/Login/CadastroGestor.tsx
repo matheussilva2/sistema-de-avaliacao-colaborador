@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, Input, Label, Button } from "@heroui/react";
 import { ApiRequestError, createUser } from "../../services/authService";
+import { getTodayDisplayDate } from "../../utils/dateUtils";
 
 export default function CadastroGestor() {
   const navigate = useNavigate();
@@ -48,8 +49,8 @@ export default function CadastroGestor() {
         phone: form.telefone,
         cpf: form.cpf,
         passWord: form.senha,
-        hireDate: getTodayDate(),
-        registrationDate: getTodayDate(),
+        hireDate: getTodayDisplayDate(),
+        registrationDate: getTodayDisplayDate(),
         userRole: "MANAGER",
         active: true,
       });
@@ -230,13 +231,6 @@ export default function CadastroGestor() {
       </Card>
     </main>
   );
-}
-
-function getTodayDate() {
-  const today = new Date();
-  const localToday = new Date(today.getTime() - today.getTimezoneOffset() * 60_000);
-
-  return localToday.toISOString().slice(0, 10);
 }
 
 function FieldError({ message }: { message?: string }) {

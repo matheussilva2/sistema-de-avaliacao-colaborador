@@ -32,6 +32,13 @@ import {
   type TrashedForm,
 } from "../../../services/formTrashService";
 import { useUndoableDelete } from "../../../components/UndoDeleteProvider";
+import {
+  DATE_INPUT_PLACEHOLDER,
+  formatDateForDisplay,
+  formatDateInput,
+  isCompleteDateValue,
+  parseDateValue,
+} from "../../../utils/dateUtils";
 
 type TrainingFormSummary = ApiForm & {
   questionCount: number;
@@ -105,8 +112,8 @@ export default function TreinamentoDetalhes() {
         setForm({
           title: trainingData.title,
           workload: String(trainingData.workload),
-          initDate: trainingData.initDate,
-          endDate: trainingData.endDate,
+          initDate: formatDateForDisplay(trainingData.initDate),
+          endDate: formatDateForDisplay(trainingData.endDate),
           description: trainingData.description,
         });
       } catch {
@@ -120,7 +127,10 @@ export default function TreinamentoDetalhes() {
   }, [id]);
 
   const handleChange = (field: keyof typeof form, value: string) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    const nextValue =
+      field === "initDate" || field === "endDate" ? formatDateInput(value) : value;
+
+    setForm((prev) => ({ ...prev, [field]: nextValue }));
   };
 
   const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -162,6 +172,26 @@ export default function TreinamentoDetalhes() {
     setIsSaving(true);
     setErrorMessage("");
     setSuccessMessage("");
+
+    const initDate = parseDateValue(form.initDate);
+    const endDate = parseDateValue(form.endDate);
+
+    if (
+      !isCompleteDateValue(form.initDate) ||
+      !initDate ||
+      !isCompleteDateValue(form.endDate) ||
+      !endDate
+    ) {
+      setErrorMessage("Informe as datas no formato dd/mm/aaaa.");
+      setIsSaving(false);
+      return;
+    }
+
+    if (endDate < initDate) {
+      setErrorMessage("A data de termino nao pode ser anterior a data de inicio.");
+      setIsSaving(false);
+      return;
+    }
 
     try {
       const updatedTraining = await updateTraining(training.idTraining, {
@@ -345,8 +375,8 @@ export default function TreinamentoDetalhes() {
                       setForm({
                         title: training.title,
                         workload: String(training.workload),
-                        initDate: training.initDate,
-                        endDate: training.endDate,
+                        initDate: formatDateForDisplay(training.initDate),
+                        endDate: formatDateForDisplay(training.endDate),
                         description: training.description,
                       });
                     }}
@@ -387,14 +417,16 @@ export default function TreinamentoDetalhes() {
             <Label className="text-sm text-neutral-600">Início</Label>
             {isEditing ? (
               <Input
-                type="date"
                 value={form.initDate}
                 onChange={(e) => handleChange("initDate", e.target.value)}
+                inputMode="numeric"
+                maxLength={10}
+                placeholder={DATE_INPUT_PLACEHOLDER}
                 className="mt-2 bg-white"
                 required
               />
             ) : (
-              <p className="font-bold text-lg">{training.initDate}</p>
+              <p className="font-bold text-lg">{formatDateForDisplay(training.initDate)}</p>
             )}
           </div>
 
@@ -402,14 +434,16 @@ export default function TreinamentoDetalhes() {
             <Label className="text-sm text-neutral-600">Término</Label>
             {isEditing ? (
               <Input
-                type="date"
                 value={form.endDate}
                 onChange={(e) => handleChange("endDate", e.target.value)}
+                inputMode="numeric"
+                maxLength={10}
+                placeholder={DATE_INPUT_PLACEHOLDER}
                 className="mt-2 bg-white"
                 required
               />
             ) : (
-              <p className="font-bold text-lg">{training.endDate}</p>
+              <p className="font-bold text-lg">{formatDateForDisplay(training.endDate)}</p>
             )}
           </div>
         </div>
@@ -815,13 +849,13 @@ function FormListGroup({
                 <div>
                   <span>Inicio</span>
                   <p className="font-semibold text-neutral-900">
-                    {form.initDate}
+                    {formatDateForDisplay(form.initDate)}
                   </p>
                 </div>
                 <div>
                   <span>Termino</span>
                   <p className="font-semibold text-neutral-900">
-                    {form.endDate}
+                    {formatDateForDisplay(form.endDate)}
                   </p>
                 </div>
                 <div>

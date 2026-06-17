@@ -4,6 +4,12 @@ import { Card, Input, Label, Button } from "@heroui/react";
 import { UserCircle2 } from "lucide-react";
 import { ApiRequestError, getAuthenticatedUser } from "../../../services/authService";
 import { createEmployeeForManager } from "../../../services/userService";
+import {
+  DATE_INPUT_PLACEHOLDER,
+  formatDateInput,
+  isCompleteDateValue,
+  parseDateValue,
+} from "../../../utils/dateUtils";
 
 export default function AdicionarColaborador() {
   const navigate = useNavigate();
@@ -25,7 +31,12 @@ export default function AdicionarColaborador() {
   const [errorMessage, setErrorMessage] = useState("");
 
   const handleFieldChange = (field: keyof typeof form, value: string) => {
-    const nextValue = field === "cpf" ? formatCpf(value) : value;
+    const nextValue =
+      field === "cpf"
+        ? formatCpf(value)
+        : field === "dataContratacao" || field === "dataRegistro"
+          ? formatDateInput(value)
+          : value;
 
     setForm((prev) => ({ ...prev, [field]: nextValue }));
     setFieldErrors((prev) => ({ ...prev, [field]: "" }));
@@ -298,9 +309,12 @@ export default function AdicionarColaborador() {
                 </Label>
                 <Input
                   id="dataContratacao"
-                  type="date"
+                  type="text"
                   value={form.dataContratacao}
                   onChange={(e) => handleFieldChange("dataContratacao", e.target.value)}
+                  inputMode="numeric"
+                  maxLength={10}
+                  placeholder={DATE_INPUT_PLACEHOLDER}
                   className="bg-white"
                   required
                 />
@@ -312,9 +326,12 @@ export default function AdicionarColaborador() {
                 </Label>
                 <Input
                   id="dataRegistro"
-                  type="date"
+                  type="text"
                   value={form.dataRegistro}
                   onChange={(e) => handleFieldChange("dataRegistro", e.target.value)}
+                  inputMode="numeric"
+                  maxLength={10}
+                  placeholder={DATE_INPUT_PLACEHOLDER}
                   className="bg-white"
                   required
                 />
@@ -415,6 +432,8 @@ function validateCollaboratorForm(form: CollaboratorForm, requirePassword: boole
 
   if (!form.dataRegistro) {
     errors.dataRegistro = "Informe a data de registro.";
+  } else if (!isCompleteDateValue(form.dataRegistro) || !parseDateValue(form.dataRegistro)) {
+    errors.dataRegistro = "Informe uma data de registro valida.";
   }
 
   if (!form.dataContratacao) {
@@ -463,14 +482,14 @@ function isValidPhone(phone: string) {
 }
 
 function validateHireDate(hireDateValue: string, registrationDateValue: string) {
-  const hireDate = parseDate(hireDateValue);
-  const registrationDate = parseDate(registrationDateValue);
+  const hireDate = parseDateValue(hireDateValue);
+  const registrationDate = parseDateValue(registrationDateValue);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const thirtyYearsAgo = new Date(today);
   thirtyYearsAgo.setFullYear(today.getFullYear() - 30);
 
-  if (!hireDate) {
+  if (!isCompleteDateValue(hireDateValue) || !hireDate) {
     return "Informe uma data de contratacao valida.";
   }
 
@@ -487,15 +506,6 @@ function validateHireDate(hireDateValue: string, registrationDateValue: string) 
   }
 
   return "";
-}
-
-function parseDate(value: string) {
-  if (!value) {
-    return null;
-  }
-
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function isValidCpf(cpf: string) {

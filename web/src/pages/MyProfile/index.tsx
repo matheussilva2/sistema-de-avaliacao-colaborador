@@ -11,6 +11,14 @@ import {
 } from "../../services/authService";
 import { updateUser, updateUserPhoto } from "../../services/userService";
 import { useUndoableAction } from "../../components/UndoDeleteProvider";
+import {
+  DATE_INPUT_PLACEHOLDER,
+  formatDateForDisplay,
+  formatDateInput,
+  getTodayDisplayDate,
+  isCompleteDateValue,
+  parseDateValue,
+} from "../../utils/dateUtils";
 
 export const MyProfile = () => {
   const { scheduleUndoableAction } = useUndoableAction();
@@ -54,8 +62,9 @@ export const MyProfile = () => {
       active: authenticatedUser.active,
       passWord: "",
       confirmPassword: "",
-      hireDate: authenticatedUser.hireDate ?? getTodayDate(),
-      registrationDate: authenticatedUser.registrationDate ?? getTodayDate(),
+      hireDate: formatDateForDisplay(authenticatedUser.hireDate) || getTodayDisplayDate(),
+      registrationDate:
+        formatDateForDisplay(authenticatedUser.registrationDate) || getTodayDisplayDate(),
     });
 
     setPhotoPreview(authenticatedUser.profilePhoto ?? "");
@@ -63,7 +72,12 @@ export const MyProfile = () => {
   }, []);
 
   const handleChange = (field: keyof typeof form, value: string | boolean) => {
-    const nextValue = field === "cpf" && typeof value === "string" ? formatCpf(value) : value;
+    const nextValue =
+      field === "cpf" && typeof value === "string"
+        ? formatCpf(value)
+        : (field === "hireDate" || field === "registrationDate") && typeof value === "string"
+          ? formatDateInput(value)
+          : value;
 
     setForm((prev) => ({
       ...prev,
@@ -186,8 +200,9 @@ export const MyProfile = () => {
             cpf: formatCpf(updatedUser.cpf),
             passWord: "",
             confirmPassword: "",
-            hireDate: updatedUser.hireDate ?? prev.hireDate,
-            registrationDate: updatedUser.registrationDate ?? prev.registrationDate,
+            hireDate: formatDateForDisplay(updatedUser.hireDate) || prev.hireDate,
+            registrationDate:
+              formatDateForDisplay(updatedUser.registrationDate) || prev.registrationDate,
           }));
           setSuccessMessage("Perfil atualizado com sucesso.");
         } finally {
@@ -373,7 +388,10 @@ export const MyProfile = () => {
                     disabled={!isEditing}
                     value={form.hireDate}
                     onChange={(e) => handleChange("hireDate", e.target.value)}
-                    type="date"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={10}
+                    placeholder={DATE_INPUT_PLACEHOLDER}
                     required
                   />
                   <FieldError message={fieldErrors.hireDate} />
@@ -387,7 +405,10 @@ export const MyProfile = () => {
                     disabled={!isEditing}
                     value={form.registrationDate}
                     onChange={(e) => handleChange("registrationDate", e.target.value)}
-                    type="date"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={10}
+                    placeholder={DATE_INPUT_PLACEHOLDER}
                     required
                   />
                   <FieldError message={fieldErrors.registrationDate} />
@@ -463,10 +484,6 @@ export const MyProfile = () => {
   );
 };
 
-function getTodayDate() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 function FieldError({ message }: { message?: string }) {
   if (!message) {
     return null;
@@ -518,6 +535,11 @@ function validateProfileForm(
 
   if (!form.registrationDate) {
     errors.registrationDate = "Informe a data de registro.";
+  } else if (
+    !isCompleteDateValue(form.registrationDate) ||
+    !parseDateValue(form.registrationDate)
+  ) {
+    errors.registrationDate = "Informe uma data de registro valida.";
   }
 
   if (!form.hireDate) {
@@ -561,14 +583,14 @@ function isValidEmail(email: string) {
 }
 
 function validateHireDate(hireDateValue: string, registrationDateValue: string) {
-  const hireDate = parseDate(hireDateValue);
-  const registrationDate = parseDate(registrationDateValue);
+  const hireDate = parseDateValue(hireDateValue);
+  const registrationDate = parseDateValue(registrationDateValue);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const thirtyYearsAgo = new Date(today);
   thirtyYearsAgo.setFullYear(today.getFullYear() - 30);
 
-  if (!hireDate) {
+  if (!isCompleteDateValue(hireDateValue) || !hireDate) {
     return "Informe uma data de contratacao valida.";
   }
 
@@ -585,15 +607,6 @@ function validateHireDate(hireDateValue: string, registrationDateValue: string) 
   }
 
   return "";
-}
-
-function parseDate(value: string) {
-  if (!value) {
-    return null;
-  }
-
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function isValidCpf(cpf: string) {

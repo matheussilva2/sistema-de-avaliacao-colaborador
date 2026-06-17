@@ -11,6 +11,7 @@ import {
   type ApiFormType,
   type ApiFormWithQuestions,
 } from "../../../services/formService";
+import { formatDateForDisplay } from "../../../utils/dateUtils";
 
 export default function TreinamentoExecucao() {
   const { id, formId } = useParams();
@@ -174,11 +175,15 @@ export default function TreinamentoExecucao() {
         <div className="mt-5 grid gap-3 md:grid-cols-3">
           <div className="rounded-md bg-primary-50 p-4">
             <p className="text-sm text-neutral-600">Inicio</p>
-            <p className="font-bold text-neutral-900">{form.initDate}</p>
+            <p className="font-bold text-neutral-900">
+              {formatDateForDisplay(form.initDate)}
+            </p>
           </div>
           <div className="rounded-md bg-primary-50 p-4">
             <p className="text-sm text-neutral-600">Prazo final</p>
-            <p className="font-bold text-neutral-900">{form.endDate}</p>
+            <p className="font-bold text-neutral-900">
+              {formatDateForDisplay(form.endDate)}
+            </p>
           </div>
           <div className="rounded-md bg-primary-50 p-4">
             <p className="text-sm text-neutral-600">Minimo</p>

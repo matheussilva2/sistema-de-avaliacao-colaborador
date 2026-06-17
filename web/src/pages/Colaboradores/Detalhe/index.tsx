@@ -18,6 +18,13 @@ import {
   restoreEmployeeFromTrash,
 } from "../../../services/employeeTrashService";
 import { useUndoableDelete } from "../../../components/UndoDeleteProvider";
+import {
+  DATE_INPUT_PLACEHOLDER,
+  formatDateForDisplay,
+  formatDateInput,
+  isCompleteDateValue,
+  parseDateValue,
+} from "../../../utils/dateUtils";
 
 export default function ColaboradorDetalhe() {
   const { id } = useParams();
@@ -60,8 +67,8 @@ export default function ColaboradorDetalhe() {
           telefone: userData.phone,
           senha: "",
           confirmarSenha: "",
-          dataContratacao: userData.hireDate ?? "",
-          dataRegistro: userData.registrationDate ?? "",
+          dataContratacao: formatDateForDisplay(userData.hireDate),
+          dataRegistro: formatDateForDisplay(userData.registrationDate),
           userRole: userData.userRole,
           situacao: userData.active ? "Ativo" : "Inativo",
         });
@@ -76,7 +83,12 @@ export default function ColaboradorDetalhe() {
   }, [id]);
 
   const handleFieldChange = (field: keyof typeof form, value: string) => {
-    const nextValue = field === "cpf" ? formatCpf(value) : value;
+    const nextValue =
+      field === "cpf"
+        ? formatCpf(value)
+        : field === "dataContratacao" || field === "dataRegistro"
+          ? formatDateInput(value)
+          : value;
 
     setForm((prev) => ({ ...prev, [field]: nextValue }));
     setFieldErrors((prev) => ({ ...prev, [field]: "" }));
@@ -379,11 +391,14 @@ export default function ColaboradorDetalhe() {
               </Label>
               <Input
                 id="profile_data_contratacao_input"
-                type="date"
+                type="text"
                 className="bg-white"
                 value={form.dataContratacao}
                 disabled={isSaving}
                 onChange={(e) => handleFieldChange("dataContratacao", e.target.value)}
+                inputMode="numeric"
+                maxLength={10}
+                placeholder={DATE_INPUT_PLACEHOLDER}
                 required
               />
               <FieldError message={fieldErrors.dataContratacao} />
@@ -395,11 +410,14 @@ export default function ColaboradorDetalhe() {
               </Label>
               <Input
                 id="profile_data_registro_input"
-                type="date"
+                type="text"
                 className="bg-white"
                 value={form.dataRegistro}
                 disabled={isSaving}
                 onChange={(e) => handleFieldChange("dataRegistro", e.target.value)}
+                inputMode="numeric"
+                maxLength={10}
+                placeholder={DATE_INPUT_PLACEHOLDER}
                 required
               />
               <FieldError message={fieldErrors.dataRegistro} />
@@ -526,6 +544,8 @@ function validateCollaboratorForm(
 
   if (!form.dataRegistro) {
     errors.dataRegistro = "Informe a data de registro.";
+  } else if (!isCompleteDateValue(form.dataRegistro) || !parseDateValue(form.dataRegistro)) {
+    errors.dataRegistro = "Informe uma data de registro valida.";
   }
 
   if (!form.dataContratacao) {
@@ -569,14 +589,14 @@ function isValidEmail(email: string) {
 }
 
 function validateHireDate(hireDateValue: string, registrationDateValue: string) {
-  const hireDate = parseDate(hireDateValue);
-  const registrationDate = parseDate(registrationDateValue);
+  const hireDate = parseDateValue(hireDateValue);
+  const registrationDate = parseDateValue(registrationDateValue);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const thirtyYearsAgo = new Date(today);
   thirtyYearsAgo.setFullYear(today.getFullYear() - 30);
 
-  if (!hireDate) {
+  if (!isCompleteDateValue(hireDateValue) || !hireDate) {
     return "Informe uma data de contratacao valida.";
   }
 
@@ -593,15 +613,6 @@ function validateHireDate(hireDateValue: string, registrationDateValue: string) 
   }
 
   return "";
-}
-
-function parseDate(value: string) {
-  if (!value) {
-    return null;
-  }
-
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function isValidCpf(cpf: string) {

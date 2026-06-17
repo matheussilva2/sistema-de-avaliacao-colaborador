@@ -1,5 +1,6 @@
 import { Input, Card } from "@heroui/react";
 import type { TrainingFormData } from "../types";
+import { DATE_INPUT_PLACEHOLDER } from "../../../../utils/dateUtils";
 
 type BasicTrainingFormProps = {
   form: TrainingFormData;
@@ -83,10 +84,12 @@ export function BasicTrainingForm({
               Data de inicio
             </label>
             <Input
-              type="date"
               value={form.startDate}
               disabled={isDisabled}
               onChange={(e) => onChange("startDate", e.target.value)}
+              inputMode="numeric"
+              maxLength={10}
+              placeholder={DATE_INPUT_PLACEHOLDER}
               className="bg-white border-2 border-neutral-300 focus:border-primary focus:ring-2 focus:ring-primary/20"
               required
             />
@@ -98,10 +101,12 @@ export function BasicTrainingForm({
               Data de termino
             </label>
             <Input
-              type="date"
               value={form.endDate}
               disabled={isDisabled}
               onChange={(e) => onChange("endDate", e.target.value)}
+              inputMode="numeric"
+              maxLength={10}
+              placeholder={DATE_INPUT_PLACEHOLDER}
               className="bg-white border-2 border-neutral-300 focus:border-primary focus:ring-2 focus:ring-primary/20"
               required
             />

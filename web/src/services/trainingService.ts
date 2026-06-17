@@ -1,4 +1,5 @@
 import { request, type ApiUser } from "./authService";
+import { parseDateValue } from "../utils/dateUtils";
 
 export type ApiTraining = {
   idTraining: string;
@@ -87,8 +88,8 @@ export function removeUserFromTraining(trainingId: string, userId: string) {
 
 export function sortTrainingsStable(trainings: ApiTraining[]) {
   return [...trainings].sort((current, next) => {
-    const currentStart = Date.parse(`${current.initDate}T00:00:00`) || 0;
-    const nextStart = Date.parse(`${next.initDate}T00:00:00`) || 0;
+    const currentStart = parseDateValue(current.initDate)?.getTime() ?? 0;
+    const nextStart = parseDateValue(next.initDate)?.getTime() ?? 0;
 
     if (currentStart !== nextStart) {
       return nextStart - currentStart;

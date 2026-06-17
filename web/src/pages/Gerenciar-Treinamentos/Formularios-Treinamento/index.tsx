@@ -25,6 +25,13 @@ import {
   restoreFormFromTrash,
 } from "../../../services/formTrashService";
 import { useUndoableDelete } from "../../../components/UndoDeleteProvider";
+import {
+  DATE_INPUT_PLACEHOLDER,
+  formatDateForDisplay,
+  formatDateInput,
+  isCompleteDateValue,
+  parseDateValue,
+} from "../../../utils/dateUtils";
 
 type ManagedTrainingForm = {
   id: string;
@@ -145,8 +152,13 @@ export default function FormulariosTreinamento() {
       return;
     }
 
+    const nextValue =
+      field === "startDeadline" || field === "endDeadline"
+        ? formatDateInput(value)
+        : value;
+
     setForms((prev) =>
-      prev.map((form) => (form.id === formId ? { ...form, [field]: value } : form)),
+      prev.map((form) => (form.id === formId ? { ...form, [field]: nextValue } : form)),
     );
   };
 
@@ -428,11 +440,20 @@ export default function FormulariosTreinamento() {
           throw new Error("Campos obrigatorios ausentes.");
         }
 
+        if (
+          !isCompleteDateValue(form.startDeadline) ||
+          !parseDateValue(form.startDeadline) ||
+          !isCompleteDateValue(form.endDeadline) ||
+          !parseDateValue(form.endDeadline)
+        ) {
+          throw new Error("Datas invalidas.");
+        }
+
         const payload = {
           title: form.title,
           formType: mapTestTypeToApi(form.type),
-          initDate: form.startDeadline,
-          endDate: form.endDeadline,
+          initDate: formatDateForDisplay(form.startDeadline),
+          endDate: formatDateForDisplay(form.endDeadline),
           minCorrectPercentage: Number(form.minCorrect),
         };
 
@@ -555,11 +576,13 @@ export default function FormulariosTreinamento() {
                     Prazo de inicio
                   </label>
                   <Input
-                    type="date"
                     value={form.startDeadline}
                     onChange={(event) =>
                       updateForm(form.id, "startDeadline", event.target.value)
                     }
+                    inputMode="numeric"
+                    maxLength={10}
+                    placeholder={DATE_INPUT_PLACEHOLDER}
                     readOnly={isLockedByAnswers}
                   />
                 </div>
@@ -568,11 +591,13 @@ export default function FormulariosTreinamento() {
                     Prazo final
                   </label>
                   <Input
-                    type="date"
                     value={form.endDeadline}
                     onChange={(event) =>
                       updateForm(form.id, "endDeadline", event.target.value)
                     }
+                    inputMode="numeric"
+                    maxLength={10}
+                    placeholder={DATE_INPUT_PLACEHOLDER}
                     readOnly={isLockedByAnswers}
                   />
                 </div>
@@ -758,8 +783,8 @@ async function hydrateForm(trainingId: string, form: ApiForm): Promise<ManagedTr
     trainingId,
     title: form.title,
     type: mapApiFormType(form.formType),
-    startDeadline: form.initDate,
-    endDeadline: form.endDate,
+    startDeadline: formatDateForDisplay(form.initDate),
+    endDeadline: formatDateForDisplay(form.endDate),
     minCorrect: String(form.minCorrectPercentage),
     questions: hydratedQuestions,
   };
@@ -770,8 +795,8 @@ function mapManagedFormToApiForm(form: ManagedTrainingForm): ApiForm {
     idForm: form.persistedId ?? form.id,
     title: form.title,
     formType: mapTestTypeToApi(form.type),
-    initDate: form.startDeadline,
-    endDate: form.endDeadline,
+    initDate: formatDateForDisplay(form.startDeadline),
+    endDate: formatDateForDisplay(form.endDeadline),
     minCorrectPercentage: Number(form.minCorrect),
   };
 }
