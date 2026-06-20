@@ -18,6 +18,7 @@ import {
   type ApiForm,
   type ApiFormType,
 } from "../../../services/formService";
+import { ApiRequestError } from "../../../services/authService";
 import { getTrainingById, type ApiTraining } from "../../../services/trainingService";
 import {
   moveFormToTrash,
@@ -52,6 +53,18 @@ type ManagedTrainingForm = {
   minCorrect: string;
   questions: Question[];
 };
+
+type ManagedFormField =
+  | "title"
+  | "type"
+  | "startDeadline"
+  | "endDeadline"
+  | "startTime"
+  | "endTime"
+  | "minCorrect";
+
+type ManagedFormFieldErrors = Partial<Record<ManagedFormField, string>>;
+type FormFieldErrorsById = Record<string, ManagedFormFieldErrors>;
 
 const trainingFormTypeLabel: Record<TestType, string> = {
   "pre-teste": "Pre-teste",
@@ -104,6 +117,7 @@ export default function FormulariosTreinamento() {
   const [isLockedByAnswers, setIsLockedByAnswers] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FormFieldErrorsById>({});
   const { scheduleUndoableDelete } = useUndoableDelete();
 
   useEffect(() => {
@@ -155,7 +169,7 @@ export default function FormulariosTreinamento() {
 
   const updateForm = (
     formId: string,
-    field: keyof Omit<ManagedTrainingForm, "id" | "trainingId" | "questions">,
+    field: ManagedFormField,
     value: string,
   ) => {
     if (isLockedByAnswers) {
@@ -170,6 +184,7 @@ export default function FormulariosTreinamento() {
     setForms((prev) =>
       prev.map((form) => (form.id === formId ? { ...form, [field]: nextValue } : form)),
     );
+    setFieldErrors((prev) => clearFormFieldError(prev, formId, field));
   };
 
   const removeForm = async (formId: string) => {
@@ -444,48 +459,25 @@ export default function FormulariosTreinamento() {
     setErrorMessage("");
     setSuccessMessage("");
 
+    const validationErrors = validateManagedForms(forms);
+
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors);
+      setErrorMessage("Corrija os campos destacados antes de salvar.");
+      setIsSaving(false);
+      return;
+    }
+
+    setFieldErrors({});
+
+    let currentForm: ManagedTrainingForm | null = null;
+
     try {
       for (const form of forms) {
-        if (
-          !form.title ||
-          !form.startDeadline ||
-          !form.endDeadline ||
-          !form.startTime ||
-          !form.endTime
-        ) {
-          throw new Error("Campos obrigatorios ausentes.");
-        }
-
-        if (
-          !isCompleteDateValue(form.startDeadline) ||
-          !parseDateValue(form.startDeadline) ||
-          !isCompleteDateValue(form.endDeadline) ||
-          !parseDateValue(form.endDeadline)
-        ) {
-          throw new Error("Datas invalidas.");
-        }
-
-        if (
-          !isCompleteTimeValue(form.startTime) ||
-          !isCompleteTimeValue(form.endTime) ||
-          !isAvailabilityWindowValid(form)
-        ) {
-          throw new Error("Horarios invalidos.");
-        }
-
-        const payload = {
-          title: form.title,
-          formType: mapTestTypeToApi(form.type),
-          initDate: formatDateForDisplay(form.startDeadline),
-          endDate: formatDateForDisplay(form.endDeadline),
-          initTime: formatTimeForDisplay(form.startTime),
-          endTime: formatTimeForDisplay(form.endTime),
-          minCorrectPercentage: Number(form.minCorrect),
-        };
-
+        currentForm = form;
         const savedForm = form.persistedId
-          ? await updateTrainingForm(form.persistedId, payload)
-          : await createTrainingForm(trainingId, payload);
+          ? await updateTrainingForm(form.persistedId, buildFormPayload(form))
+          : await createTrainingForm(trainingId, buildFormPayload(form));
 
         if (!form.persistedId) {
           for (const question of form.questions) {
@@ -508,7 +500,25 @@ export default function FormulariosTreinamento() {
 
       setSuccessMessage("Formularios salvos com sucesso.");
       navigate(`/painel/gerenciar-treinamentos/${trainingId}`);
-    } catch {
+    } catch (error) {
+      if (error instanceof ApiRequestError && currentForm) {
+        const apiFieldErrors = mapApiErrorsToManagedForm(error.fieldErrors);
+
+        if (Object.keys(apiFieldErrors).length > 0) {
+          const currentFormId = currentForm.id;
+
+          setFieldErrors((prev) => ({
+            ...prev,
+            [currentFormId]: {
+              ...prev[currentFormId],
+              ...apiFieldErrors,
+            },
+          }));
+          setErrorMessage("Corrija os campos destacados antes de salvar.");
+          return;
+        }
+      }
+
       setErrorMessage("Nao foi possivel salvar os formularios. Confira os campos.");
     } finally {
       setIsSaving(false);
@@ -542,7 +552,10 @@ export default function FormulariosTreinamento() {
           </div>
         </Card>
 
-        {forms.map((form) => (
+        {forms.map((form) => {
+          const currentFieldErrors = fieldErrors[form.id] ?? {};
+
+          return (
           <Card key={form.id} className="p-6">
             <div className="mb-5 flex flex-col gap-4">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -575,7 +588,9 @@ export default function FormulariosTreinamento() {
                     value={form.title}
                     onChange={(event) => updateForm(form.id, "title", event.target.value)}
                     readOnly={isLockedByAnswers}
+                    className={getInputClassName(Boolean(currentFieldErrors.title))}
                   />
+                  <FieldError message={currentFieldErrors.title} />
                 </div>
 
                 <div className="flex flex-col gap-2">
@@ -588,11 +603,12 @@ export default function FormulariosTreinamento() {
                       updateForm(form.id, "type", event.target.value as TestType)
                     }
                     disabled={isLockedByAnswers}
-                    className="rounded-md border-2 border-neutral-300 bg-white p-3 text-sm outline-none focus:border-primary"
+                    className={getSelectClassName(Boolean(currentFieldErrors.type))}
                   >
                     <option value="pre-teste">Pre-teste</option>
                     <option value="pos-teste">Pos-teste</option>
                   </select>
+                  <FieldError message={currentFieldErrors.type} />
                 </div>
               </div>
 
@@ -610,7 +626,9 @@ export default function FormulariosTreinamento() {
                     maxLength={10}
                     placeholder={DATE_INPUT_PLACEHOLDER}
                     readOnly={isLockedByAnswers}
+                    className={getInputClassName(Boolean(currentFieldErrors.startDeadline))}
                   />
+                  <FieldError message={currentFieldErrors.startDeadline} />
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium text-neutral-700">
@@ -624,7 +642,9 @@ export default function FormulariosTreinamento() {
                     }
                     placeholder={TIME_INPUT_PLACEHOLDER}
                     readOnly={isLockedByAnswers}
+                    className={getInputClassName(Boolean(currentFieldErrors.startTime))}
                   />
+                  <FieldError message={currentFieldErrors.startTime} />
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium text-neutral-700">
@@ -639,7 +659,9 @@ export default function FormulariosTreinamento() {
                     maxLength={10}
                     placeholder={DATE_INPUT_PLACEHOLDER}
                     readOnly={isLockedByAnswers}
+                    className={getInputClassName(Boolean(currentFieldErrors.endDeadline))}
                   />
+                  <FieldError message={currentFieldErrors.endDeadline} />
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium text-neutral-700">
@@ -653,7 +675,9 @@ export default function FormulariosTreinamento() {
                     }
                     placeholder={TIME_INPUT_PLACEHOLDER}
                     readOnly={isLockedByAnswers}
+                    className={getInputClassName(Boolean(currentFieldErrors.endTime))}
                   />
+                  <FieldError message={currentFieldErrors.endTime} />
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium text-neutral-700">
@@ -665,7 +689,7 @@ export default function FormulariosTreinamento() {
                       updateForm(form.id, "minCorrect", event.target.value)
                     }
                     disabled={isLockedByAnswers}
-                    className="rounded-md border-2 border-neutral-300 bg-white p-3 text-sm outline-none focus:border-primary"
+                    className={getSelectClassName(Boolean(currentFieldErrors.minCorrect))}
                   >
                     <option value="50">50% de acertos</option>
                     <option value="60">60% de acertos</option>
@@ -673,6 +697,7 @@ export default function FormulariosTreinamento() {
                     <option value="80">80% de acertos</option>
                     <option value="90">90% de acertos</option>
                   </select>
+                  <FieldError message={currentFieldErrors.minCorrect} />
                 </div>
               </div>
             </div>
@@ -704,7 +729,8 @@ export default function FormulariosTreinamento() {
               </p>
             )}
           </Card>
-        ))}
+          );
+        })}
 
         {errorMessage && (
           <p className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -803,6 +829,26 @@ function TrainingFormsSkeleton() {
   );
 }
 
+function FieldError({ message }: { message?: string }) {
+  if (!message) {
+    return null;
+  }
+
+  return <p className="text-xs font-semibold text-red-600">{message}</p>;
+}
+
+function getInputClassName(hasError: boolean) {
+  return hasError ? "rounded-md border-2 border-red-500" : "";
+}
+
+function getSelectClassName(hasError: boolean) {
+  const borderClass = hasError
+    ? "border-red-500 focus:border-red-500"
+    : "border-neutral-300 focus:border-primary";
+
+  return `rounded-md border-2 ${borderClass} bg-white p-3 text-sm outline-none`;
+}
+
 function mapTestTypeToApi(type: TestType): ApiFormType {
   return type === "pre-teste" ? "PRE_TEST" : "POST_TEST";
 }
@@ -859,30 +905,192 @@ function mapManagedFormToApiForm(form: ManagedTrainingForm): ApiForm {
   };
 }
 
-function isAvailabilityWindowValid(form: ManagedTrainingForm) {
+function buildFormPayload(form: ManagedTrainingForm) {
+  return {
+    title: form.title.trim(),
+    formType: mapTestTypeToApi(form.type),
+    initDate: formatDateForDisplay(form.startDeadline),
+    endDate: formatDateForDisplay(form.endDeadline),
+    initTime: formatTimeForDisplay(form.startTime),
+    endTime: formatTimeForDisplay(form.endTime),
+    minCorrectPercentage: Number(form.minCorrect),
+  };
+}
+
+function validateManagedForms(forms: ManagedTrainingForm[]) {
+  return forms.reduce<FormFieldErrorsById>((errorsByForm, form) => {
+    const formErrors = validateManagedForm(form);
+
+    if (Object.keys(formErrors).length > 0) {
+      errorsByForm[form.id] = formErrors;
+    }
+
+    return errorsByForm;
+  }, {});
+}
+
+function validateManagedForm(form: ManagedTrainingForm) {
+  const errors: ManagedFormFieldErrors = {};
   const startDate = parseDateValue(form.startDeadline);
   const endDate = parseDateValue(form.endDeadline);
   const startTime = parseTimeValue(form.startTime);
   const endTime = parseTimeValue(form.endTime);
+  const minCorrect = Number(form.minCorrect);
 
-  if (!startDate || !endDate || !startTime || !endTime) {
-    return false;
+  if (!form.title.trim()) {
+    errors.title = "Informe o titulo do formulario.";
   }
 
-  const start = new Date(
-    startDate.getFullYear(),
-    startDate.getMonth(),
-    startDate.getDate(),
-    startTime.hours,
-    startTime.minutes,
-  );
-  const end = new Date(
-    endDate.getFullYear(),
-    endDate.getMonth(),
-    endDate.getDate(),
-    endTime.hours,
-    endTime.minutes,
-  );
+  if (!form.type) {
+    errors.type = "Informe o tipo de formulario.";
+  }
 
-  return end >= start;
+  if (!form.startDeadline.trim()) {
+    errors.startDeadline = "Informe a data de inicio.";
+  } else if (!isCompleteDateValue(form.startDeadline) || !startDate) {
+    errors.startDeadline = "Informe uma data de inicio valida.";
+  }
+
+  if (!form.endDeadline.trim()) {
+    errors.endDeadline = "Informe a data final.";
+  } else if (!isCompleteDateValue(form.endDeadline) || !endDate) {
+    errors.endDeadline = "Informe uma data final valida.";
+  }
+
+  if (!form.startTime.trim()) {
+    errors.startTime = "Informe o horario de inicio.";
+  } else if (!isCompleteTimeValue(form.startTime) || !startTime) {
+    errors.startTime = "Informe um horario de inicio valido.";
+  }
+
+  if (!form.endTime.trim()) {
+    errors.endTime = "Informe o horario final.";
+  } else if (!isCompleteTimeValue(form.endTime) || !endTime) {
+    errors.endTime = "Informe um horario final valido.";
+  }
+
+  if (!form.minCorrect.trim()) {
+    errors.minCorrect = "Informe o minimo de acertos.";
+  } else if (!Number.isFinite(minCorrect) || minCorrect < 0 || minCorrect > 100) {
+    errors.minCorrect = "Informe um minimo de acertos entre 0 e 100.";
+  }
+
+  if (startDate && endDate && endDate < startDate) {
+    errors.endDeadline = "A data final nao pode ser anterior a data de inicio.";
+  }
+
+  if (startDate && endDate && startTime && endTime) {
+    const start = buildDateTime(startDate, startTime);
+    const end = buildDateTime(endDate, endTime);
+
+    if (end < start) {
+      errors.endTime =
+        "O horario final deve ser posterior ou igual ao inicio da disponibilidade.";
+    }
+  }
+
+  return errors;
+}
+
+function buildDateTime(
+  date: Date,
+  time: NonNullable<ReturnType<typeof parseTimeValue>>,
+) {
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    time.hours,
+    time.minutes,
+  );
+}
+
+function clearFormFieldError(
+  fieldErrors: FormFieldErrorsById,
+  formId: string,
+  field: ManagedFormField,
+) {
+  if (!fieldErrors[formId]?.[field]) {
+    return fieldErrors;
+  }
+
+  const nextFormErrors = { ...fieldErrors[formId], [field]: "" };
+  const nextErrors = { ...fieldErrors, [formId]: nextFormErrors };
+
+  if (Object.values(nextFormErrors).every((message) => !message)) {
+    delete nextErrors[formId];
+  }
+
+  return nextErrors;
+}
+
+function mapApiErrorsToManagedForm(apiErrors: Record<string, string>) {
+  const fieldMap: Record<string, ManagedFormField> = {
+    title: "title",
+    formType: "type",
+    initDate: "startDeadline",
+    endDate: "endDeadline",
+    initTime: "startTime",
+    endTime: "endTime",
+    minCorrectPercentage: "minCorrect",
+  };
+
+  return Object.entries(apiErrors).reduce<ManagedFormFieldErrors>(
+    (formErrors, [apiField, message]) => {
+      const formField = fieldMap[apiField];
+
+      if (formField) {
+        formErrors[formField] = normalizeApiFormErrorMessage(message);
+      }
+
+      return formErrors;
+    },
+    {},
+  );
+}
+
+function normalizeApiFormErrorMessage(message: string) {
+  if (message.includes("Data de inicio")) {
+    return message.includes("obrigatoria")
+      ? "Informe a data de inicio."
+      : "Informe uma data de inicio valida.";
+  }
+
+  if (message.includes("Data de termino")) {
+    return message.includes("posterior") || message.includes("igual")
+      ? "A data final nao pode ser anterior a data de inicio."
+      : message.includes("obrigatoria")
+        ? "Informe a data final."
+        : "Informe uma data final valida.";
+  }
+
+  if (message.includes("Horario de inicio")) {
+    return message.includes("obrigatorio")
+      ? "Informe o horario de inicio."
+      : "Informe um horario de inicio valido.";
+  }
+
+  if (message.includes("Horario de termino")) {
+    return message.includes("posterior") || message.includes("igual")
+      ? "O horario final deve ser posterior ou igual ao inicio da disponibilidade."
+      : message.includes("obrigatorio")
+        ? "Informe o horario final."
+        : "Informe um horario final valido.";
+  }
+
+  if (message.includes("Titulo")) {
+    return "Informe o titulo do formulario.";
+  }
+
+  if (message.includes("Tipo de formulario")) {
+    return "Informe o tipo de formulario.";
+  }
+
+  if (message.includes("Percentual minimo")) {
+    return message.includes("obrigatorio")
+      ? "Informe o minimo de acertos."
+      : "Informe um minimo de acertos entre 0 e 100.";
+  }
+
+  return message;
 }
