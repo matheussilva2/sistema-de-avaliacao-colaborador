@@ -3,10 +3,14 @@ package com.avaliacao.api.service;
 import com.avaliacao.api.dtos.FormRecordDTO;
 import com.avaliacao.api.exceptions.FieldValidationException;
 import com.avaliacao.api.models.FormModel;
+import com.avaliacao.api.repositories.AlternativeRepository;
+import com.avaliacao.api.repositories.FormAnswerRepository;
 import com.avaliacao.api.repositories.FormRepository;
+import com.avaliacao.api.repositories.QuestionRepository;
 import com.avaliacao.api.repositories.TrainingRepository;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DateTimeException;
 import java.time.LocalDate;
@@ -27,10 +31,20 @@ public class FormService {
 
     private final FormRepository formRepository;
     private final TrainingRepository trainingRepository;
+    private final QuestionRepository questionRepository;
+    private final AlternativeRepository alternativeRepository;
+    private final FormAnswerRepository formAnswerRepository;
 
-    public FormService(FormRepository formRepository, TrainingRepository trainingRepository){
+    public FormService(FormRepository formRepository,
+                       TrainingRepository trainingRepository,
+                       QuestionRepository questionRepository,
+                       AlternativeRepository alternativeRepository,
+                       FormAnswerRepository formAnswerRepository){
         this.formRepository = formRepository;
         this.trainingRepository = trainingRepository;
+        this.questionRepository = questionRepository;
+        this.alternativeRepository = alternativeRepository;
+        this.formAnswerRepository = formAnswerRepository;
     }
 
     public Optional<FormModel> create(UUID trainingId, FormRecordDTO formRecordDTO){
@@ -75,6 +89,8 @@ public class FormService {
             return Optional.empty();
         }
 
+        ensureFormHasNoAnswers(id);
+
         var form = formO.get();
         validateForm(formRecordDTO);
         BeanUtils.copyProperties(formRecordDTO,form);
@@ -83,6 +99,7 @@ public class FormService {
         return Optional.of(formRepository.save(form));
     }
 
+    @Transactional
     public boolean delete(UUID id){
         var formO = formRepository.findById(id);
 
@@ -90,8 +107,31 @@ public class FormService {
             return false;
         }
 
+        ensureFormHasNoAnswers(id);
+
+        var questions = questionRepository.findByFormIdForm(id);
+
+        for(var question : questions){
+            alternativeRepository.deleteAll(
+                    alternativeRepository.findByQuestionIdQuestion(question.getIdQuestion())
+            );
+        }
+        alternativeRepository.flush();
+
+        questionRepository.deleteAll(questions);
+        questionRepository.flush();
         formRepository.delete(formO.get());
         return true;
+    }
+
+    private void ensureFormHasNoAnswers(UUID formId){
+        if(!formAnswerRepository.existsByFormIdForm(formId)){
+            return;
+        }
+
+        var errors = new LinkedHashMap<String, String>();
+        errors.put("formId", "Formulario ja tem respostas cadastradas");
+        throw new FieldValidationException(errors);
     }
 
     private void validateForm(FormRecordDTO formRecordDTO){

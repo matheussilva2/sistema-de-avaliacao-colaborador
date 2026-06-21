@@ -1,7 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, Card, Input, Skeleton } from "@heroui/react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { TestFormSection } from "../Novo-Treinamento/components/TestFormSection";
+import {
+  TestFormSection,
+  type QuestionFieldErrors,
+  type TestFormSectionErrors,
+} from "../Novo-Treinamento/components/TestFormSection";
 import type { Question, TestType } from "../Novo-Treinamento/types";
 import {
   createFormQuestion,
@@ -9,7 +13,6 @@ import {
   createTrainingForm,
   deleteAlternative,
   deleteQuestion,
-  deleteTrainingForm,
   getFormQuestions,
   getQuestionAlternatives,
   getTrainingResults,
@@ -22,7 +25,6 @@ import { ApiRequestError } from "../../../services/authService";
 import { getTrainingById, type ApiTraining } from "../../../services/trainingService";
 import {
   moveFormToTrash,
-  removeFormFromTrash,
   restoreFormFromTrash,
 } from "../../../services/formTrashService";
 import { useUndoableDelete } from "../../../components/UndoDeleteProvider";
@@ -64,12 +66,22 @@ type ManagedFormField =
   | "minCorrect";
 
 type ManagedFormFieldErrors = Partial<Record<ManagedFormField, string>>;
-type FormFieldErrorsById = Record<string, ManagedFormFieldErrors>;
+type ManagedFormValidationErrors = ManagedFormFieldErrors & {
+  questions?: TestFormSectionErrors;
+};
+type FormFieldErrorsById = Record<string, ManagedFormValidationErrors>;
 
 const trainingFormTypeLabel: Record<TestType, string> = {
   "pre-teste": "Pre-teste",
   "pos-teste": "Pos-teste",
 };
+
+const TEMPORAL_FIELDS: ManagedFormField[] = [
+  "startDeadline",
+  "endDeadline",
+  "startTime",
+  "endTime",
+];
 
 const createEmptyQuestion = (): Question => ({
   id: crypto.randomUUID(),
@@ -181,10 +193,24 @@ export default function FormulariosTreinamento() {
         ? formatDateInput(value)
         : value;
 
+    const currentForm = forms.find((form) => form.id === formId);
+
+    if (currentForm && TEMPORAL_FIELDS.includes(field)) {
+      const temporalErrors = validateTemporalFields({
+        ...currentForm,
+        [field]: nextValue,
+      });
+
+      setFieldErrors((current) =>
+        replaceTemporalFieldErrors(current, formId, temporalErrors),
+      );
+    } else {
+      setFieldErrors((prev) => clearFormFieldError(prev, formId, field));
+    }
+
     setForms((prev) =>
       prev.map((form) => (form.id === formId ? { ...form, [field]: nextValue } : form)),
     );
-    setFieldErrors((prev) => clearFormFieldError(prev, formId, field));
   };
 
   const removeForm = async (formId: string) => {
@@ -215,13 +241,14 @@ export default function FormulariosTreinamento() {
 
     scheduleUndoableDelete({
       id: `form:${apiForm.idForm}`,
-      title: "Formulario removido",
-      description: `${apiForm.title} sera excluido definitivamente em 5 segundos.`,
+      title: "Formulario movido para a lixeira",
+      description: "Voce pode desfazer esta movimentacao em ate 5 segundos.",
       onStart: () => {
         moveFormToTrash(trainingId, apiForm);
         setForms((prev) => prev.filter((formItem) => formItem.id !== formId));
         setSuccessMessage("");
         setErrorMessage("");
+        navigate(`/painel/gerenciar-treinamentos/${trainingId}`);
       },
       onUndo: () => {
         restoreFormFromTrash(trainingId, apiForm.idForm);
@@ -231,20 +258,7 @@ export default function FormulariosTreinamento() {
           ),
         );
       },
-      onCommit: async () => {
-        await deleteTrainingForm(apiForm.idForm);
-        removeFormFromTrash(trainingId, apiForm.idForm);
-        navigate(`/painel/gerenciar-treinamentos/${trainingId}`);
-      },
-      onCommitError: () => {
-        restoreFormFromTrash(trainingId, apiForm.idForm);
-        setForms((prev) =>
-          prev.some((formItem) => formItem.id === form.id)
-            ? prev
-            : [...prev, form],
-        );
-        setErrorMessage("Nao foi possivel excluir definitivamente o formulario.");
-      },
+      onCommit: () => undefined,
     });
   };
 
@@ -377,9 +391,7 @@ export default function FormulariosTreinamento() {
           ? {
               ...question,
               options: question.options.map((option) =>
-                option.id === optId
-                  ? { ...option, isCorrect: !option.isCorrect }
-                  : option,
+                ({ ...option, isCorrect: option.id === optId }),
               ),
             }
           : question,
@@ -612,21 +624,18 @@ export default function FormulariosTreinamento() {
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium text-neutral-700">
                     Data de inicio
                   </label>
-                  <Input
+                  <DateField
                     value={form.startDeadline}
-                    onChange={(event) =>
-                      updateForm(form.id, "startDeadline", event.target.value)
-                    }
-                    inputMode="numeric"
-                    maxLength={10}
-                    placeholder={DATE_INPUT_PLACEHOLDER}
+                    onChange={(value) => updateForm(form.id, "startDeadline", value)}
+                    min={getTodayNativeDate()}
                     readOnly={isLockedByAnswers}
-                    className={getInputClassName(Boolean(currentFieldErrors.startDeadline))}
+                    hasError={Boolean(currentFieldErrors.startDeadline)}
+                    label="Selecionar data de inicio"
                   />
                   <FieldError message={currentFieldErrors.startDeadline} />
                 </div>
@@ -650,16 +659,13 @@ export default function FormulariosTreinamento() {
                   <label className="text-sm font-medium text-neutral-700">
                     Data final
                   </label>
-                  <Input
+                  <DateField
                     value={form.endDeadline}
-                    onChange={(event) =>
-                      updateForm(form.id, "endDeadline", event.target.value)
-                    }
-                    inputMode="numeric"
-                    maxLength={10}
-                    placeholder={DATE_INPUT_PLACEHOLDER}
+                    onChange={(value) => updateForm(form.id, "endDeadline", value)}
+                    min={toNativeDateValue(form.startDeadline) || getTodayNativeDate()}
                     readOnly={isLockedByAnswers}
-                    className={getInputClassName(Boolean(currentFieldErrors.endDeadline))}
+                    hasError={Boolean(currentFieldErrors.endDeadline)}
+                    label="Selecionar data final"
                   />
                   <FieldError message={currentFieldErrors.endDeadline} />
                 </div>
@@ -721,6 +727,7 @@ export default function FormulariosTreinamento() {
                 handleRemoveOption(form.id, qId, optId)
               }
               isReadOnly={isLockedByAnswers}
+              errors={currentFieldErrors.questions}
             />
 
             {isLockedByAnswers && (
@@ -837,6 +844,64 @@ function FieldError({ message }: { message?: string }) {
   return <p className="text-xs font-semibold text-red-600">{message}</p>;
 }
 
+function DateField({
+  value,
+  onChange,
+  min,
+  readOnly,
+  hasError,
+  label,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  min: string;
+  readOnly: boolean;
+  hasError: boolean;
+  label: string;
+}) {
+  const calendarInputRef = useRef<HTMLInputElement>(null);
+
+  const openCalendar = () => {
+    const calendarInput = calendarInputRef.current;
+
+    if (!calendarInput || readOnly) {
+      return;
+    }
+
+    try {
+      calendarInput.showPicker?.();
+    } catch {
+      calendarInput.focus();
+    }
+  };
+
+  return (
+    <div>
+      <Input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        onFocus={openCalendar}
+        onClick={openCalendar}
+        inputMode="numeric"
+        maxLength={10}
+        placeholder={DATE_INPUT_PLACEHOLDER}
+        readOnly={readOnly}
+        className={getInputClassName(hasError)}
+      />
+      <input
+        ref={calendarInputRef}
+        type="date"
+        value={toNativeDateValue(value)}
+        min={min}
+        disabled={readOnly}
+        onChange={(event) => onChange(event.target.value)}
+        aria-label={label}
+        className="sr-only"
+      />
+    </div>
+  );
+}
+
 function getInputClassName(hasError: boolean) {
   return hasError ? "rounded-md border-2 border-red-500" : "";
 }
@@ -930,7 +995,7 @@ function validateManagedForms(forms: ManagedTrainingForm[]) {
 }
 
 function validateManagedForm(form: ManagedTrainingForm) {
-  const errors: ManagedFormFieldErrors = {};
+  const errors: ManagedFormValidationErrors = {};
   const startDate = parseDateValue(form.startDeadline);
   const endDate = parseDateValue(form.endDeadline);
   const startTime = parseTimeValue(form.startTime);
@@ -949,6 +1014,8 @@ function validateManagedForm(form: ManagedTrainingForm) {
     errors.startDeadline = "Informe a data de inicio.";
   } else if (!isCompleteDateValue(form.startDeadline) || !startDate) {
     errors.startDeadline = "Informe uma data de inicio valida.";
+  } else if (startDate < getTodayAtMidnight()) {
+    errors.startDeadline = "A data de inicio nao pode ser anterior a hoje.";
   }
 
   if (!form.endDeadline.trim()) {
@@ -989,7 +1056,151 @@ function validateManagedForm(form: ManagedTrainingForm) {
     }
   }
 
+  const questionErrors: Record<string, QuestionFieldErrors> = {};
+
+  if (form.questions.length === 0) {
+    errors.questions = {
+      questions: "Adicione pelo menos uma questao ao formulario.",
+    };
+  } else {
+    form.questions.forEach((question) => {
+      const currentQuestionErrors: QuestionFieldErrors = {};
+      const optionErrors: Record<string, string> = {};
+      const correctOptions = question.options.filter((option) => option.isCorrect);
+
+      if (!question.title.trim()) {
+        currentQuestionErrors.title = "Informe o enunciado da questao.";
+      }
+
+      if (question.options.length < 2) {
+        currentQuestionErrors.alternatives =
+          "Adicione pelo menos duas alternativas a esta questao.";
+      }
+
+      question.options.forEach((option) => {
+        if (!option.text.trim()) {
+          optionErrors[option.id] = "Informe o texto da alternativa.";
+        }
+      });
+
+      if (Object.keys(optionErrors).length > 0) {
+        currentQuestionErrors.optionsById = optionErrors;
+      }
+
+      if (correctOptions.length === 0) {
+        currentQuestionErrors.correctOption =
+          "Selecione uma alternativa correta para esta questao.";
+      } else if (correctOptions.length > 1) {
+        currentQuestionErrors.correctOption =
+          "Selecione apenas uma alternativa correta para esta questao.";
+      }
+
+      if (Object.keys(currentQuestionErrors).length > 0) {
+        questionErrors[question.id] = currentQuestionErrors;
+      }
+    });
+
+    if (Object.keys(questionErrors).length > 0) {
+      errors.questions = { byQuestion: questionErrors };
+    }
+  }
+
+  if (startDate && isToday(startDate) && startTime && isStartTimeTooEarly(startTime)) {
+    errors.startTime = "O horario de inicio pode ser no maximo 5 minutos anterior ao atual.";
+  }
+
   return errors;
+}
+
+function validateTemporalFields(form: ManagedTrainingForm): ManagedFormFieldErrors {
+  const errors: ManagedFormFieldErrors = {};
+  const startDate = parseDateValue(form.startDeadline);
+  const endDate = parseDateValue(form.endDeadline);
+  const startTime = parseTimeValue(form.startTime);
+  const endTime = parseTimeValue(form.endTime);
+
+  if (isCompleteDateValue(form.startDeadline)) {
+    if (!startDate) {
+      errors.startDeadline = "Informe uma data de inicio valida.";
+    } else if (startDate < getTodayAtMidnight()) {
+      errors.startDeadline = "A data de inicio nao pode ser anterior a hoje.";
+    }
+  }
+
+  if (isCompleteDateValue(form.endDeadline)) {
+    if (!endDate) {
+      errors.endDeadline = "Informe uma data final valida.";
+    } else if (startDate && endDate < startDate) {
+      errors.endDeadline = "A data final nao pode ser anterior a data de inicio.";
+    }
+  }
+
+  if (form.startTime && !startTime) {
+    errors.startTime = "Informe um horario de inicio valido.";
+  } else if (startDate && isToday(startDate) && startTime && isStartTimeTooEarly(startTime)) {
+    errors.startTime = "O horario de inicio pode ser no maximo 5 minutos anterior ao atual.";
+  }
+
+  if (form.endTime && !endTime) {
+    errors.endTime = "Informe um horario final valido.";
+  }
+
+  if (startDate && endDate && startTime && endTime) {
+    const start = buildDateTime(startDate, startTime);
+    const end = buildDateTime(endDate, endTime);
+
+    if (end < start) {
+      errors.endTime =
+        "O horario final deve ser posterior ou igual ao inicio da disponibilidade.";
+    }
+  }
+
+  return errors;
+}
+
+function getTodayAtMidnight() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today;
+}
+
+function isToday(date: Date) {
+  return date.getTime() === getTodayAtMidnight().getTime();
+}
+
+function isStartTimeTooEarly(time: NonNullable<ReturnType<typeof parseTimeValue>>) {
+  const earliestTime = new Date();
+  earliestTime.setMinutes(earliestTime.getMinutes() - 5);
+  earliestTime.setSeconds(0, 0);
+
+  const selectedTime = new Date();
+  selectedTime.setHours(time.hours, time.minutes, 0, 0);
+
+  return selectedTime < earliestTime;
+}
+
+function getTodayNativeDate() {
+  const today = getTodayAtMidnight();
+
+  return [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, "0"),
+    String(today.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function toNativeDateValue(value: string) {
+  const date = parseDateValue(value);
+
+  if (!date) {
+    return "";
+  }
+
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
 }
 
 function buildDateTime(
@@ -1003,6 +1214,32 @@ function buildDateTime(
     time.hours,
     time.minutes,
   );
+}
+
+function replaceTemporalFieldErrors(
+  fieldErrors: FormFieldErrorsById,
+  formId: string,
+  temporalErrors: ManagedFormFieldErrors,
+) {
+  const nextFormErrors: ManagedFormValidationErrors = {
+    ...fieldErrors[formId],
+  };
+
+  TEMPORAL_FIELDS.forEach((field) => {
+    delete nextFormErrors[field];
+  });
+
+  Object.assign(nextFormErrors, temporalErrors);
+
+  const nextErrors = { ...fieldErrors };
+
+  if (Object.keys(nextFormErrors).length === 0) {
+    delete nextErrors[formId];
+  } else {
+    nextErrors[formId] = nextFormErrors;
+  }
+
+  return nextErrors;
 }
 
 function clearFormFieldError(

@@ -8,13 +8,11 @@ import {
   type ApiUserRole,
 } from "../../../services/authService";
 import {
-  deleteUser,
   getUserById,
   updateUser,
 } from "../../../services/userService";
 import {
   moveEmployeeToTrash,
-  removeEmployeeFromTrash,
   restoreEmployeeFromTrash,
 } from "../../../services/employeeTrashService";
 import { useUndoableDelete } from "../../../components/UndoDeleteProvider";
@@ -193,8 +191,8 @@ export default function ColaboradorDetalhe() {
 
     scheduleUndoableDelete({
       id: `employee:${user.id}`,
-      title: "Colaborador removido",
-      description: `${user.name} ${user.lastName} sera excluido definitivamente em 5 segundos.`,
+      title: "Colaborador movido para a lixeira",
+      description: "Voce pode desfazer esta movimentacao em ate 5 segundos.",
       onStart: () => {
         moveEmployeeToTrash(manager.id, user);
         navigate("/painel/colaboradores");
@@ -203,14 +201,7 @@ export default function ColaboradorDetalhe() {
         restoreEmployeeFromTrash(manager.id, user.id);
         navigate(`/painel/colaboradores/${user.id}`);
       },
-      onCommit: async () => {
-        await deleteUser(user.id);
-        removeEmployeeFromTrash(manager.id, user.id);
-      },
-      onCommitError: () => {
-        restoreEmployeeFromTrash(manager.id, user.id);
-        navigate(`/painel/colaboradores/${user.id}`);
-      },
+      onCommit: () => undefined,
     });
   };
 

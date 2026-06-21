@@ -2,12 +2,11 @@ import { Button, Skeleton } from "@heroui/react";
 import { Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { deleteUser, getEmployeesByManager } from "../../services/userService";
+import { getEmployeesByManager } from "../../services/userService";
 import { getAuthenticatedUser, type ApiUser } from "../../services/authService";
 import {
   getTrashedEmployeeIds,
   moveEmployeeToTrash,
-  removeEmployeeFromTrash,
   restoreEmployeeFromTrash,
 } from "../../services/employeeTrashService";
 import { useUndoableDelete } from "../../components/UndoDeleteProvider";
@@ -66,8 +65,8 @@ export default function Colaboradores() {
 
     scheduleUndoableDelete({
       id: `employee:${user.id}`,
-      title: "Colaborador removido",
-      description: `${user.name} ${user.lastName} sera excluido definitivamente em 5 segundos.`,
+      title: "Colaborador movido para a lixeira",
+      description: "Voce pode desfazer esta movimentacao em ate 5 segundos.",
       onStart: () => {
         moveEmployeeToTrash(managerId, user);
         setColaboradores((prev) => prev.filter((item) => item.id !== user.id));
@@ -76,15 +75,7 @@ export default function Colaboradores() {
         restoreEmployeeFromTrash(managerId, user.id);
         setColaboradores((prev) => [...prev, user].sort(compareUsersByName));
       },
-      onCommit: async () => {
-        await deleteUser(user.id);
-        removeEmployeeFromTrash(managerId, user.id);
-      },
-      onCommitError: () => {
-        restoreEmployeeFromTrash(managerId, user.id);
-        setColaboradores((prev) => [...prev, user].sort(compareUsersByName));
-        setErrorMessage("Nao foi possivel excluir definitivamente este colaborador.");
-      },
+      onCommit: () => undefined,
     });
   };
 

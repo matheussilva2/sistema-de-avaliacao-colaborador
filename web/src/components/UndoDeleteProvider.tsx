@@ -1,5 +1,6 @@
 import { Button } from "@heroui/react";
 import { RotateCcw, X } from "lucide-react";
+import { flushSync } from "react-dom";
 import {
   createContext,
   useCallback,
@@ -8,6 +9,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type ReactNode,
 } from "react";
 
@@ -28,6 +30,7 @@ type UndoNotification = {
   id: string;
   title: string;
   description?: string;
+  timeoutMs: number;
 };
 
 type PendingUndoAction = UndoableActionRequest & {
@@ -58,6 +61,7 @@ export function UndoDeleteProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      window.clearTimeout(action.timerId);
       pendingActionsRef.current.delete(id);
       removeNotification(id);
 
@@ -80,15 +84,16 @@ export function UndoDeleteProvider({ children }: { children: ReactNode }) {
 
       window.clearTimeout(action.timerId);
       pendingActionsRef.current.delete(id);
-      removeNotification(id);
-      action.onUndo();
-    },
-    [removeNotification],
-  );
 
-  const dismissNotification = useCallback(
-    (id: string) => {
-      removeNotification(id);
+      // Cada tela mantém o snapshot anterior no callback onUndo. Forçar a
+      // atualização síncrona evita que a interface espere uma nova busca na API
+      // para exibir os dados restaurados.
+      flushSync(() => {
+        action.onUndo();
+        removeNotification(id);
+      });
+
+      window.location.reload();
     },
     [removeNotification],
   );
@@ -96,6 +101,7 @@ export function UndoDeleteProvider({ children }: { children: ReactNode }) {
   const scheduleUndoableAction = useCallback(
     (request: UndoableActionRequest) => {
       const id = request.id ?? crypto.randomUUID();
+      const timeoutMs = request.timeoutMs ?? DEFAULT_UNDO_TIMEOUT_MS;
       const existingAction = pendingActionsRef.current.get(id);
 
       if (existingAction) {
@@ -107,7 +113,7 @@ export function UndoDeleteProvider({ children }: { children: ReactNode }) {
 
       const timerId = window.setTimeout(() => {
         void runCommit(id);
-      }, request.timeoutMs ?? DEFAULT_UNDO_TIMEOUT_MS);
+      }, timeoutMs);
 
       pendingActionsRef.current.set(id, {
         ...request,
@@ -121,6 +127,7 @@ export function UndoDeleteProvider({ children }: { children: ReactNode }) {
           id,
           title: request.title,
           description: request.description,
+          timeoutMs,
         },
       ]);
 
@@ -172,15 +179,17 @@ export function UndoDeleteProvider({ children }: { children: ReactNode }) {
 
               <button
                 type="button"
-                onClick={() => dismissNotification(notification.id)}
+                onClick={() => void runCommit(notification.id)}
                 className="rounded-md p-1 text-neutral-500 transition hover:bg-gray-100 hover:text-neutral-900"
-                aria-label="Fechar aviso"
+                aria-label="Confirmar ação agora"
+                title="Confirmar ação agora"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="mt-4 flex justify-end">
+            <div className="mt-4 flex items-center justify-end gap-3">
+              <CountdownTimer timeoutMs={notification.timeoutMs} />
               <Button
                 className="bg-primary text-white"
                 onPress={() => undoAction(notification.id)}
@@ -193,6 +202,47 @@ export function UndoDeleteProvider({ children }: { children: ReactNode }) {
         ))}
       </div>
     </UndoDeleteContext.Provider>
+  );
+}
+
+function CountdownTimer({ timeoutMs }: { timeoutMs: number }) {
+  const progressStyle: CSSProperties = {
+    animation: `undo-countdown ${timeoutMs}ms linear forwards`,
+  };
+
+  return (
+    <div
+      className="relative size-9 shrink-0"
+      aria-label="Tempo restante para confirmar a ação"
+      role="img"
+      title="A ação será confirmada quando o anel terminar"
+    >
+      <svg viewBox="0 0 36 36" className="size-full" aria-hidden="true">
+        <circle
+          cx="18"
+          cy="18"
+          r="15"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="3"
+          className="text-primary-100"
+        />
+        <circle
+          cx="18"
+          cy="18"
+          r="15"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="3"
+          pathLength="100"
+          strokeDasharray="100"
+          strokeDashoffset="0"
+          strokeLinecap="round"
+          className="origin-center -rotate-90 text-primary"
+          style={progressStyle}
+        />
+      </svg>
+    </div>
   );
 }
 
