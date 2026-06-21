@@ -11,10 +11,12 @@ import {
   removeUserFromTraining,
   type ApiTraining,
 } from "../../services/trainingService";
+import { useUndoableAction } from "../../components/UndoDeleteProvider";
 
 export default function AdicionarAluno() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { scheduleUndoableAction } = useUndoableAction();
   const [training, setTraining] = useState<ApiTraining | null>(null);
   const [employees, setEmployees] = useState<ApiUser[]>([]);
   const [linkedUsers, setLinkedUsers] = useState<ApiUser[]>([]);
@@ -87,6 +89,10 @@ export default function AdicionarAluno() {
   }, [employees, selectedIds]);
 
   const toggleSelect = (colaboradorId: string) => {
+    if (isSaving) {
+      return;
+    }
+
     setSelectedIds((current) =>
       current.includes(colaboradorId)
         ? current.filter((item) => item !== colaboradorId)
@@ -95,11 +101,19 @@ export default function AdicionarAluno() {
   };
 
   const handleRemoveSelected = (colaboradorId: string) => {
+    if (isSaving) {
+      return;
+    }
+
     setSelectedIds((current) => current.filter((item) => item !== colaboradorId));
   };
 
   const handleUnlink = async (colaboradorId: string) => {
     if (!id) {
+      return;
+    }
+
+    if (isSaving) {
       return;
     }
 
@@ -129,8 +143,12 @@ export default function AdicionarAluno() {
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!id) {
+      return;
+    }
+
+    if (selectedIds.length === 0) {
       return;
     }
 
@@ -138,20 +156,50 @@ export default function AdicionarAluno() {
     setErrorMessage("");
     setSuccessMessage("");
 
-    const usersToAdd = selectedIds;
+    const previousLinkedUsers = [...linkedUsers];
+    const previousSelectedIds = [...selectedIds];
+    const userIdsToAdd = [...selectedIds];
+    const usersToAdd = employees.filter((employee) => userIdsToAdd.includes(employee.id));
 
-    try {
-      await Promise.all(usersToAdd.map((userId) => addUserToTraining(id, userId)));
+    scheduleUndoableAction({
+      id: `training-users:add:${id}`,
+      title: "Colaboradores vinculados",
+      description: "Os vinculos serao salvos em 5 segundos.",
+      onStart: () => {
+        setLinkedUsers((current) => {
+          const currentIds = new Set(current.map((user) => user.id));
+          const nextUsers = usersToAdd.filter((user) => !currentIds.has(user.id));
 
-      const updatedLinkedUsers = await getTrainingUsers(id);
-      setLinkedUsers(updatedLinkedUsers);
-      setSelectedIds([]);
-      setSuccessMessage("Colaboradores vinculados com sucesso.");
-    } catch {
-      setErrorMessage("Nao foi possivel salvar os vinculos.");
-    } finally {
-      setIsSaving(false);
-    }
+          return [...current, ...nextUsers];
+        });
+        setSelectedIds((current) => current.filter((userId) => !userIdsToAdd.includes(userId)));
+        setSuccessMessage("Colaboradores vinculados na tela. Voce pode desfazer antes de salvar.");
+      },
+      onUndo: () => {
+        setLinkedUsers(previousLinkedUsers);
+        setSelectedIds(previousSelectedIds);
+        setIsSaving(false);
+        setSuccessMessage("");
+      },
+      onCommit: async () => {
+        try {
+          await Promise.all(userIdsToAdd.map((userId) => addUserToTraining(id, userId)));
+
+          const updatedLinkedUsers = await getTrainingUsers(id);
+          setLinkedUsers(updatedLinkedUsers);
+          setSelectedIds([]);
+          setSuccessMessage("Colaboradores vinculados com sucesso.");
+        } finally {
+          setIsSaving(false);
+        }
+      },
+      onCommitError: () => {
+        setLinkedUsers(previousLinkedUsers);
+        setSelectedIds(previousSelectedIds);
+        setErrorMessage("Nao foi possivel salvar os vinculos.");
+        setSuccessMessage("");
+      },
+    });
   };
 
   if (isLoading) {

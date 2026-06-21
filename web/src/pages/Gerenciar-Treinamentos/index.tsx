@@ -1,15 +1,18 @@
 import { Button, Input, Card, Skeleton } from "@heroui/react";
-import { Eye, EyeOff, Clock, CalendarDays } from "lucide-react";
+import { Eye, EyeOff, Clock, CalendarDays, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { getAuthenticatedUser } from "../../services/authService";
 import {
+  deleteTraining,
   getTrainingsByManager,
   readTrainingsCache,
   sortTrainingsStable,
   type ApiTraining,
   writeTrainingsCache,
 } from "../../services/trainingService";
+import { useUndoableDelete } from "../../components/UndoDeleteProvider";
+import { formatDateForDisplay, parseDateValue } from "../../utils/dateUtils";
 
 type StatusFilter = "todos" | "em_andamento" | "concluido" | "oculto";
 
@@ -21,8 +24,10 @@ export const GerenciarTreinamentos = () => {
   const [selectedStatus, setSelectedStatus] = useState<StatusFilter>("todos");
   const [trainings, setTrainings] = useState<ApiTraining[]>([]);
   const [hiddenTrainingIds, setHiddenTrainingIds] = useState<string[]>([]);
+  const [managerCacheKey, setManagerCacheKey] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const { scheduleUndoableDelete } = useUndoableDelete();
 
   const navigate = useNavigate();
 
@@ -45,6 +50,7 @@ export const GerenciarTreinamentos = () => {
       }
 
       const cacheKey = `${managerTrainingsCachePrefix}:${manager.id}`;
+      setManagerCacheKey(cacheKey);
       const cachedTrainings = readTrainingsCache(cacheKey);
 
       if (cachedTrainings) {
@@ -103,6 +109,43 @@ export const GerenciarTreinamentos = () => {
 
       localStorage.setItem(hiddenTrainingsKey, JSON.stringify(next));
       return next;
+    });
+  };
+
+  const updateTrainingList = (updater: (current: ApiTraining[]) => ApiTraining[]) => {
+    setTrainings((current) => {
+      const nextTrainings = sortTrainingsStable(updater(current));
+
+      if (managerCacheKey) {
+        writeTrainingsCache(managerCacheKey, nextTrainings);
+      }
+
+      return nextTrainings;
+    });
+  };
+
+  const handleDeleteTraining = (training: ApiTraining) => {
+    setErrorMessage("");
+
+    scheduleUndoableDelete({
+      id: `training:${training.idTraining}`,
+      title: "Treinamento excluido",
+      description: `${training.title} sera excluido definitivamente em 5 segundos.`,
+      onStart: () => {
+        updateTrainingList((current) =>
+          current.filter((item) => item.idTraining !== training.idTraining),
+        );
+      },
+      onUndo: () => {
+        updateTrainingList((current) => [...current, training]);
+      },
+      onCommit: async () => {
+        await deleteTraining(training.idTraining);
+      },
+      onCommitError: () => {
+        updateTrainingList((current) => [...current, training]);
+        setErrorMessage("Nao foi possivel excluir definitivamente este treinamento.");
+      },
     });
   };
 
@@ -181,23 +224,38 @@ export const GerenciarTreinamentos = () => {
                     <div className="absolute inset-0 bg-linear-to-br from-primary-100 to-primary-400" />
                   )}
 
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleOculto(training.idTraining);
-                    }}
-                    className="relative bg-white/90 hover:bg-white text-neutral-700 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 transition-colors shadow"
-                  >
-                    {isHidden ? (
-                      <>
-                        <EyeOff size={14} /> Mostrar
-                      </>
-                    ) : (
-                      <>
-                        <Eye size={14} /> Ocultar
-                      </>
-                    )}
-                  </button>
+                  <div className="relative flex flex-wrap justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleOculto(training.idTraining);
+                      }}
+                      className="bg-white/90 hover:bg-white text-neutral-700 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 transition-colors shadow"
+                    >
+                      {isHidden ? (
+                        <>
+                          <EyeOff size={14} /> Mostrar
+                        </>
+                      ) : (
+                        <>
+                          <Eye size={14} /> Ocultar
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteTraining(training);
+                      }}
+                      className="bg-white/90 hover:bg-white text-red-700 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 transition-colors shadow"
+                    >
+                      <Trash2 size={14} />
+                      Excluir
+                    </button>
+                  </div>
                 </div>
 
                 <div className="p-5 flex flex-col gap-4">
@@ -218,13 +276,13 @@ export const GerenciarTreinamentos = () => {
                     <div className="flex items-center gap-2 text-sm">
                       <CalendarDays size={16} />
                       <span>
-                        <strong>Inicio:</strong> {training.initDate}
+                        <strong>Inicio:</strong> {formatDateForDisplay(training.initDate)}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       <CalendarDays size={16} />
                       <span>
-                        <strong>Termino:</strong> {training.endDate}
+                        <strong>Termino:</strong> {formatDateForDisplay(training.endDate)}
                       </span>
                     </div>
                   </div>
@@ -290,9 +348,9 @@ function isTrainingConcluded(endDate: string) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const trainingEndDate = new Date(`${endDate}T00:00:00`);
+  const trainingEndDate = parseDateValue(endDate);
 
-  if (Number.isNaN(trainingEndDate.getTime())) {
+  if (!trainingEndDate) {
     return false;
   }
 

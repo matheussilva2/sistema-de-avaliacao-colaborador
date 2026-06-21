@@ -8,10 +8,12 @@ export const SESSION_TIMEOUT_MS = 7 * 60 * 1000;
 
 export class ApiRequestError extends Error {
   status: number;
+  fieldErrors: Record<string, string>;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, fieldErrors: Record<string, string> = {}) {
     super(message);
     this.status = status;
+    this.fieldErrors = fieldErrors;
   }
 }
 
@@ -65,6 +67,7 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
     throw new ApiRequestError(
       errorMessage || "Nao foi possivel concluir a requisicao.",
       response.status,
+      parseFieldErrors(errorMessage),
     );
   }
 
@@ -121,7 +124,9 @@ export function syncUserMockWithApiUser(user: ApiUser) {
 }
 
 export function saveAuthenticatedUser(user: ApiUser) {
-  localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+  // Auth is tab-scoped so different browser windows can keep different logins.
+  sessionStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+  clearLegacySharedAuth();
   markSessionActivity();
   syncUserMockWithApiUser(user);
 }
@@ -132,23 +137,23 @@ export function getAuthenticatedUser() {
     return null;
   }
 
-  const storedUser = localStorage.getItem(AUTH_USER_KEY);
+  const storedUser = sessionStorage.getItem(AUTH_USER_KEY);
 
   if (!storedUser) {
+    clearLegacySharedAuth();
     return null;
   }
 
   try {
     return JSON.parse(storedUser) as ApiUser;
   } catch {
-    localStorage.removeItem(AUTH_USER_KEY);
+    sessionStorage.removeItem(AUTH_USER_KEY);
     return null;
   }
 }
 
 export function clearAuthenticatedUser() {
-  localStorage.removeItem(AUTH_USER_KEY);
-  localStorage.removeItem(AUTH_LAST_ACTIVITY_KEY);
+  clearLegacySharedAuth();
   sessionStorage.clear();
 }
 
@@ -167,11 +172,11 @@ export function createUser(payload: CreateUserPayload) {
 }
 
 export function touchSession() {
-  if (!localStorage.getItem(AUTH_USER_KEY)) {
+  if (!sessionStorage.getItem(AUTH_USER_KEY)) {
     return;
   }
 
-  if (!localStorage.getItem(AUTH_LAST_ACTIVITY_KEY)) {
+  if (!sessionStorage.getItem(AUTH_LAST_ACTIVITY_KEY)) {
     markSessionActivity();
     return;
   }
@@ -185,8 +190,8 @@ export function touchSession() {
 }
 
 export function isSessionExpired() {
-  const storedUser = localStorage.getItem(AUTH_USER_KEY);
-  const lastActivity = localStorage.getItem(AUTH_LAST_ACTIVITY_KEY);
+  const storedUser = sessionStorage.getItem(AUTH_USER_KEY);
+  const lastActivity = sessionStorage.getItem(AUTH_LAST_ACTIVITY_KEY);
 
   if (!storedUser) {
     return false;
@@ -196,9 +201,44 @@ export function isSessionExpired() {
     return true;
   }
 
-  return Date.now() - Number(lastActivity) > SESSION_TIMEOUT_MS;
+  const lastActivityTime = Number(lastActivity);
+
+  if (Number.isNaN(lastActivityTime)) {
+    return true;
+  }
+
+  return Date.now() - lastActivityTime > SESSION_TIMEOUT_MS;
 }
 
 function markSessionActivity() {
-  localStorage.setItem(AUTH_LAST_ACTIVITY_KEY, String(Date.now()));
+  sessionStorage.setItem(AUTH_LAST_ACTIVITY_KEY, String(Date.now()));
+}
+
+function clearLegacySharedAuth() {
+  localStorage.removeItem(AUTH_USER_KEY);
+  localStorage.removeItem(AUTH_LAST_ACTIVITY_KEY);
+}
+
+function parseFieldErrors(responseText: string) {
+  if (!responseText) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(responseText) as unknown;
+
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+
+    return Object.entries(parsed).reduce<Record<string, string>>((errors, [field, message]) => {
+      if (typeof message === "string") {
+        errors[field] = message;
+      }
+
+      return errors;
+    }, {});
+  } catch {
+    return {};
+  }
 }

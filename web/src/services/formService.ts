@@ -8,6 +8,8 @@ export type ApiForm = {
   formType: ApiFormType;
   initDate: string;
   endDate: string;
+  initTime?: string | null;
+  endTime?: string | null;
   minCorrectPercentage: number;
 };
 
@@ -54,6 +56,8 @@ export type FormPayload = {
   formType: ApiFormType;
   initDate: string;
   endDate: string;
+  initTime: string;
+  endTime: string;
   minCorrectPercentage: number;
 };
 
@@ -109,6 +113,12 @@ export function createFormQuestion(formId: string, title: string) {
   });
 }
 
+export function deleteQuestion(questionId: string) {
+  return request<string>(`/questions/${questionId}`, {
+    method: "DELETE",
+  });
+}
+
 export function getQuestionAlternatives(questionId: string) {
   return request<ApiAlternative[]>(`/questions/${questionId}/alternatives`, {
     method: "GET",
@@ -123,6 +133,12 @@ export function createQuestionAlternative(
   return request<ApiAlternative>(`/questions/${questionId}/alternatives`, {
     method: "POST",
     body: JSON.stringify({ text, correct }),
+  });
+}
+
+export function deleteAlternative(alternativeId: string) {
+  return request<string>(`/alternatives/${alternativeId}`, {
+    method: "DELETE",
   });
 }
 

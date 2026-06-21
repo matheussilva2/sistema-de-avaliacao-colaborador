@@ -10,8 +10,18 @@ import {
   type ApiUserRole,
 } from "../../services/authService";
 import { updateUser, updateUserPhoto } from "../../services/userService";
+import { useUndoableAction } from "../../components/UndoDeleteProvider";
+import {
+  DATE_INPUT_PLACEHOLDER,
+  formatDateForDisplay,
+  formatDateInput,
+  getTodayDisplayDate,
+  isCompleteDateValue,
+  parseDateValue,
+} from "../../utils/dateUtils";
 
 export const MyProfile = () => {
+  const { scheduleUndoableAction } = useUndoableAction();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -52,8 +62,9 @@ export const MyProfile = () => {
       active: authenticatedUser.active,
       passWord: "",
       confirmPassword: "",
-      hireDate: authenticatedUser.hireDate ?? getTodayDate(),
-      registrationDate: authenticatedUser.registrationDate ?? getTodayDate(),
+      hireDate: formatDateForDisplay(authenticatedUser.hireDate) || getTodayDisplayDate(),
+      registrationDate:
+        formatDateForDisplay(authenticatedUser.registrationDate) || getTodayDisplayDate(),
     });
 
     setPhotoPreview(authenticatedUser.profilePhoto ?? "");
@@ -61,7 +72,12 @@ export const MyProfile = () => {
   }, []);
 
   const handleChange = (field: keyof typeof form, value: string | boolean) => {
-    const nextValue = field === "cpf" && typeof value === "string" ? formatCpf(value) : value;
+    const nextValue =
+      field === "cpf" && typeof value === "string"
+        ? formatCpf(value)
+        : (field === "hireDate" || field === "registrationDate") && typeof value === "string"
+          ? formatDateInput(value)
+          : value;
 
     setForm((prev) => ({
       ...prev,
@@ -121,46 +137,97 @@ export const MyProfile = () => {
       return;
     }
 
-    try {
-      const updatedUser = await updateUser(loggedUser.id, {
-        name: form.name,
-        lastName: form.lastName,
-        email: form.email,
-        phone: form.phone,
-        cpf: form.cpf,
-        userRole: form.userRole,
-        active: form.active,
-        passWord: form.passWord || undefined,
-        hireDate: form.hireDate,
-        registrationDate: form.registrationDate,
-      });
+    const previousUser = loggedUser;
+    const previousForm = { ...form };
+    const payload = {
+      name: form.name,
+      lastName: form.lastName,
+      email: form.email,
+      phone: form.phone,
+      cpf: form.cpf,
+      userRole: form.userRole,
+      active: form.active,
+      passWord: form.passWord || undefined,
+      hireDate: form.hireDate,
+      registrationDate: form.registrationDate,
+    };
+    const optimisticUser: ApiUser = {
+      ...loggedUser,
+      name: form.name,
+      lastName: form.lastName,
+      email: form.email,
+      phone: form.phone,
+      cpf: form.cpf,
+      userRole: form.userRole,
+      active: form.active,
+      hireDate: form.hireDate,
+      registrationDate: form.registrationDate,
+    };
+    const optimisticForm = {
+      ...form,
+      passWord: "",
+      confirmPassword: "",
+    };
 
-      saveAuthenticatedUser(updatedUser);
-      setLoggedUser(updatedUser);
-      setForm((prev) => ({
-        ...prev,
-        cpf: formatCpf(updatedUser.cpf),
-        passWord: "",
-        confirmPassword: "",
-        hireDate: updatedUser.hireDate ?? prev.hireDate,
-        registrationDate: updatedUser.registrationDate ?? prev.registrationDate,
-      }));
-      setIsEditing(false);
-      setSuccessMessage("Perfil atualizado com sucesso.");
-    } catch (error) {
-      if (error instanceof ApiRequestError && error.status === 409) {
-        const conflict = getProfileConflictMessage(error.message);
-        setErrorMessage(conflict.global);
-        setFieldErrors((prev) => ({
-          ...prev,
-          [conflict.field]: conflict.fieldMessage,
-        }));
-      } else {
-        setErrorMessage("Nao foi possivel salvar o perfil. Confira os dados.");
-      }
-    } finally {
-      setIsSaving(false);
-    }
+    scheduleUndoableAction({
+      id: `profile:update:${loggedUser.id}`,
+      title: "Alteracoes no perfil",
+      description: "Os dados do perfil serao salvos em 5 segundos.",
+      onStart: () => {
+        saveAuthenticatedUser(optimisticUser);
+        setLoggedUser(optimisticUser);
+        setForm(optimisticForm);
+        setFieldErrors({});
+        setIsEditing(false);
+        setSuccessMessage("Alteracoes aplicadas na tela. Voce pode desfazer antes de salvar.");
+      },
+      onUndo: () => {
+        saveAuthenticatedUser(previousUser);
+        setLoggedUser(previousUser);
+        setForm(previousForm);
+        setIsEditing(true);
+        setIsSaving(false);
+        setSuccessMessage("");
+      },
+      onCommit: async () => {
+        try {
+          const updatedUser = await updateUser(loggedUser.id, payload);
+
+          saveAuthenticatedUser(updatedUser);
+          setLoggedUser(updatedUser);
+          setForm((prev) => ({
+            ...prev,
+            cpf: formatCpf(updatedUser.cpf),
+            passWord: "",
+            confirmPassword: "",
+            hireDate: formatDateForDisplay(updatedUser.hireDate) || prev.hireDate,
+            registrationDate:
+              formatDateForDisplay(updatedUser.registrationDate) || prev.registrationDate,
+          }));
+          setSuccessMessage("Perfil atualizado com sucesso.");
+        } finally {
+          setIsSaving(false);
+        }
+      },
+      onCommitError: (error) => {
+        saveAuthenticatedUser(previousUser);
+        setLoggedUser(previousUser);
+        setForm(previousForm);
+        setIsEditing(true);
+        setSuccessMessage("");
+
+        if (error instanceof ApiRequestError && error.status === 409) {
+          const conflict = getProfileConflictMessage(error.message);
+          setErrorMessage(conflict.global);
+          setFieldErrors((prev) => ({
+            ...prev,
+            [conflict.field]: conflict.fieldMessage,
+          }));
+        } else {
+          setErrorMessage("Nao foi possivel salvar o perfil. Confira os dados.");
+        }
+      },
+    });
   };
 
   const isEmployee = form.userRole === "EMPLOYEE";
@@ -321,7 +388,10 @@ export const MyProfile = () => {
                     disabled={!isEditing}
                     value={form.hireDate}
                     onChange={(e) => handleChange("hireDate", e.target.value)}
-                    type="date"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={10}
+                    placeholder={DATE_INPUT_PLACEHOLDER}
                     required
                   />
                   <FieldError message={fieldErrors.hireDate} />
@@ -335,7 +405,10 @@ export const MyProfile = () => {
                     disabled={!isEditing}
                     value={form.registrationDate}
                     onChange={(e) => handleChange("registrationDate", e.target.value)}
-                    type="date"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={10}
+                    placeholder={DATE_INPUT_PLACEHOLDER}
                     required
                   />
                   <FieldError message={fieldErrors.registrationDate} />
@@ -359,13 +432,14 @@ export const MyProfile = () => {
                   <Button
                     type="button"
                     className="w-full bg-primary text-white"
+                    isDisabled={isSaving}
                     onPress={() => {
                       setIsEditing(true);
                       setSuccessMessage("");
                       setErrorMessage("");
                     }}
                   >
-                    Editar Dados
+                    {isSaving ? "Aguardando..." : "Editar Dados"}
                   </Button>
                 ) : (
                   <>
@@ -409,10 +483,6 @@ export const MyProfile = () => {
     </div>
   );
 };
-
-function getTodayDate() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function FieldError({ message }: { message?: string }) {
   if (!message) {
@@ -465,6 +535,11 @@ function validateProfileForm(
 
   if (!form.registrationDate) {
     errors.registrationDate = "Informe a data de registro.";
+  } else if (
+    !isCompleteDateValue(form.registrationDate) ||
+    !parseDateValue(form.registrationDate)
+  ) {
+    errors.registrationDate = "Informe uma data de registro valida.";
   }
 
   if (!form.hireDate) {
@@ -508,14 +583,14 @@ function isValidEmail(email: string) {
 }
 
 function validateHireDate(hireDateValue: string, registrationDateValue: string) {
-  const hireDate = parseDate(hireDateValue);
-  const registrationDate = parseDate(registrationDateValue);
+  const hireDate = parseDateValue(hireDateValue);
+  const registrationDate = parseDateValue(registrationDateValue);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const thirtyYearsAgo = new Date(today);
   thirtyYearsAgo.setFullYear(today.getFullYear() - 30);
 
-  if (!hireDate) {
+  if (!isCompleteDateValue(hireDateValue) || !hireDate) {
     return "Informe uma data de contratacao valida.";
   }
 
@@ -532,15 +607,6 @@ function validateHireDate(hireDateValue: string, registrationDateValue: string) 
   }
 
   return "";
-}
-
-function parseDate(value: string) {
-  if (!value) {
-    return null;
-  }
-
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function isValidCpf(cpf: string) {

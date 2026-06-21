@@ -26,10 +26,19 @@ import {
   clearFormTrash,
   getTrashedFormIds,
   getTrashedForms,
+  moveFormToTrash,
   removeFormFromTrash,
   restoreFormFromTrash,
   type TrashedForm,
 } from "../../../services/formTrashService";
+import {
+  DATE_INPUT_PLACEHOLDER,
+  formatDateForDisplay,
+  formatDateTimeForDisplay,
+  formatDateInput,
+  isCompleteDateValue,
+  parseDateValue,
+} from "../../../utils/dateUtils";
 
 type TrainingFormSummary = ApiForm & {
   questionCount: number;
@@ -102,8 +111,8 @@ export default function TreinamentoDetalhes() {
         setForm({
           title: trainingData.title,
           workload: String(trainingData.workload),
-          initDate: trainingData.initDate,
-          endDate: trainingData.endDate,
+          initDate: formatDateForDisplay(trainingData.initDate),
+          endDate: formatDateForDisplay(trainingData.endDate),
           description: trainingData.description,
         });
       } catch {
@@ -117,7 +126,10 @@ export default function TreinamentoDetalhes() {
   }, [id]);
 
   const handleChange = (field: keyof typeof form, value: string) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    const nextValue =
+      field === "initDate" || field === "endDate" ? formatDateInput(value) : value;
+
+    setForm((prev) => ({ ...prev, [field]: nextValue }));
   };
 
   const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -160,6 +172,26 @@ export default function TreinamentoDetalhes() {
     setErrorMessage("");
     setSuccessMessage("");
 
+    const initDate = parseDateValue(form.initDate);
+    const endDate = parseDateValue(form.endDate);
+
+    if (
+      !isCompleteDateValue(form.initDate) ||
+      !initDate ||
+      !isCompleteDateValue(form.endDate) ||
+      !endDate
+    ) {
+      setErrorMessage("Informe as datas no formato dd/mm/aaaa.");
+      setIsSaving(false);
+      return;
+    }
+
+    if (endDate < initDate) {
+      setErrorMessage("A data de termino nao pode ser anterior a data de inicio.");
+      setIsSaving(false);
+      return;
+    }
+
     try {
       const updatedTraining = await updateTraining(training.idTraining, {
         title: form.title,
@@ -201,7 +233,23 @@ export default function TreinamentoDetalhes() {
   };
 
   const handleDeleteFormForever = async (formId: string) => {
-    const hasAnswers = trainingResults.some((answer) => answer.form.idForm === formId);
+    const trashedForm = trashedForms.find((item) => item.form.idForm === formId);
+
+    if (!trashedForm) {
+      return;
+    }
+
+    let latestResults: ApiFormAnswer[];
+
+    try {
+      latestResults = await getTrainingResults(training.idTraining);
+    } catch {
+      setErrorMessage("Nao foi possivel verificar respostas cadastradas.");
+      setSuccessMessage("");
+      return;
+    }
+
+    const hasAnswers = latestResults.some((answer) => answer.form.idForm === formId);
 
     if (hasAnswers) {
       setErrorMessage("Formulario ja tem respostas cadastradas.");
@@ -212,6 +260,8 @@ export default function TreinamentoDetalhes() {
     try {
       await deleteTrainingForm(formId);
       setTrashedForms(removeFormFromTrash(training.idTraining, formId));
+      setErrorMessage("");
+      setSuccessMessage("Formulario excluido definitivamente.");
     } catch {
       setErrorMessage("Nao foi possivel excluir definitivamente o formulario.");
       setSuccessMessage("");
@@ -219,7 +269,17 @@ export default function TreinamentoDetalhes() {
   };
 
   const handleEmptyFormsTrash = async () => {
-    const formsWithAnswers = new Set(trainingResults.map((answer) => answer.form.idForm));
+    let latestResults: ApiFormAnswer[];
+
+    try {
+      latestResults = await getTrainingResults(training.idTraining);
+    } catch {
+      setErrorMessage("Nao foi possivel verificar respostas cadastradas.");
+      setSuccessMessage("");
+      return;
+    }
+
+    const formsWithAnswers = new Set(latestResults.map((answer) => answer.form.idForm));
     const blockedForms = trashedForms.filter((item) =>
       formsWithAnswers.has(item.form.idForm),
     );
@@ -230,14 +290,29 @@ export default function TreinamentoDetalhes() {
       return;
     }
 
-    try {
-      await Promise.all(trashedForms.map((item) => deleteTrainingForm(item.form.idForm)));
-      clearFormTrash(training.idTraining);
-      setTrashedForms([]);
-    } catch {
-      setErrorMessage("Nao foi possivel esvaziar toda a lixeira de formularios.");
+    const trashSnapshot = [...trashedForms];
+    const deletionResults = await Promise.allSettled(
+      trashSnapshot.map((item) => deleteTrainingForm(item.form.idForm)),
+    );
+    const remainingForms = trashSnapshot.filter(
+      (_, index) => deletionResults[index].status === "rejected",
+    );
+
+    clearFormTrash(training.idTraining);
+    remainingForms
+      .slice()
+      .reverse()
+      .forEach((item) => moveFormToTrash(training.idTraining, item.form));
+    setTrashedForms(remainingForms);
+
+    if (remainingForms.length > 0) {
+      setErrorMessage("Nao foi possivel excluir todos os formularios da lixeira.");
       setSuccessMessage("");
+      return;
     }
+
+    setErrorMessage("");
+    setSuccessMessage("Lixeira de formularios esvaziada com sucesso.");
   };
 
   return (
@@ -298,8 +373,8 @@ export default function TreinamentoDetalhes() {
                       setForm({
                         title: training.title,
                         workload: String(training.workload),
-                        initDate: training.initDate,
-                        endDate: training.endDate,
+                        initDate: formatDateForDisplay(training.initDate),
+                        endDate: formatDateForDisplay(training.endDate),
                         description: training.description,
                       });
                     }}
@@ -340,14 +415,16 @@ export default function TreinamentoDetalhes() {
             <Label className="text-sm text-neutral-600">Início</Label>
             {isEditing ? (
               <Input
-                type="date"
                 value={form.initDate}
                 onChange={(e) => handleChange("initDate", e.target.value)}
+                inputMode="numeric"
+                maxLength={10}
+                placeholder={DATE_INPUT_PLACEHOLDER}
                 className="mt-2 bg-white"
                 required
               />
             ) : (
-              <p className="font-bold text-lg">{training.initDate}</p>
+              <p className="font-bold text-lg">{formatDateForDisplay(training.initDate)}</p>
             )}
           </div>
 
@@ -355,14 +432,16 @@ export default function TreinamentoDetalhes() {
             <Label className="text-sm text-neutral-600">Término</Label>
             {isEditing ? (
               <Input
-                type="date"
                 value={form.endDate}
                 onChange={(e) => handleChange("endDate", e.target.value)}
+                inputMode="numeric"
+                maxLength={10}
+                placeholder={DATE_INPUT_PLACEHOLDER}
                 className="mt-2 bg-white"
                 required
               />
             ) : (
-              <p className="font-bold text-lg">{training.endDate}</p>
+              <p className="font-bold text-lg">{formatDateForDisplay(training.endDate)}</p>
             )}
           </div>
         </div>
@@ -768,13 +847,13 @@ function FormListGroup({
                 <div>
                   <span>Inicio</span>
                   <p className="font-semibold text-neutral-900">
-                    {form.initDate}
+                    {formatDateTimeForDisplay(form.initDate, form.initTime, "00:00")}
                   </p>
                 </div>
                 <div>
                   <span>Termino</span>
                   <p className="font-semibold text-neutral-900">
-                    {form.endDate}
+                    {formatDateTimeForDisplay(form.endDate, form.endTime, "23:59")}
                   </p>
                 </div>
                 <div>

@@ -6,5 +6,6 @@ import jakarta.validation.constraints.NotEmpty;
 import java.util.List;
 
 public record FormAnswerRecordDTO(
-        @NotEmpty List<@Valid QuestionAnswerRecordDTO> answers) {
+        @NotEmpty(message = "Informe ao menos uma resposta")
+        List<@Valid QuestionAnswerRecordDTO> answers) {
 }

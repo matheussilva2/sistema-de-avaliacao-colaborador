@@ -3,6 +3,7 @@ package com.avaliacao.api.service;
 import com.avaliacao.api.dtos.TrainingImageRecordDTO;
 import com.avaliacao.api.dtos.TrainingRecordDTO;
 import com.avaliacao.api.enums.UserRole;
+import com.avaliacao.api.exceptions.FieldValidationException;
 import com.avaliacao.api.models.TrainingModel;
 import com.avaliacao.api.models.UserModel;
 import com.avaliacao.api.repositories.FormAnswerRepository;
@@ -12,6 +13,11 @@ import jakarta.transaction.Transactional;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
+import java.time.DateTimeException;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -19,6 +25,8 @@ import java.util.UUID;
 
 @Service
 public class TrainingService {
+
+    private static final DateTimeFormatter DISPLAY_DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final TrainingRepository trainingRepository;
     private final UserRepository userRepository;
@@ -33,18 +41,24 @@ public class TrainingService {
     }
 
     public TrainingModel create(TrainingRecordDTO trainingRecordDTO){
+        validateTraining(trainingRecordDTO);
+
         var training = new TrainingModel();
         BeanUtils.copyProperties(trainingRecordDTO,training);
+        applyNormalizedFields(training, trainingRecordDTO);
         setManagerIfPresent(training, trainingRecordDTO.managerId());
 
         return trainingRepository.save(training);
     }
 
     public TrainingModel createForManager(UUID managerId, TrainingRecordDTO trainingRecordDTO){
+        validateTraining(trainingRecordDTO);
+
         var manager = getManagerOrThrow(managerId);
         var training = new TrainingModel();
 
         BeanUtils.copyProperties(trainingRecordDTO,training);
+        applyNormalizedFields(training, trainingRecordDTO);
         training.setManager(manager);
 
         return trainingRepository.save(training);
@@ -71,7 +85,9 @@ public class TrainingService {
         }
 
         var training = trainingO.get();
+        validateTraining(trainingRecordDTO);
         BeanUtils.copyProperties(trainingRecordDTO,training);
+        applyNormalizedFields(training, trainingRecordDTO);
         setManagerIfPresent(training, trainingRecordDTO.managerId());
 
         return Optional.of(trainingRepository.save(training));
@@ -130,7 +146,9 @@ public class TrainingService {
         var training = trainingO.get();
 
         if(formAnswerRepository.existsByFormTrainingIdTrainingAndUserId(trainingId,userId)){
-            throw new IllegalStateException("Colaborador ja iniciou o treinamento.");
+            var errors = new LinkedHashMap<String, String>();
+            errors.put("userId", "Colaborador ja iniciou o treinamento");
+            throw new FieldValidationException(errors);
         }
 
         training.getUsers().remove(userO.get());
@@ -165,5 +183,69 @@ public class TrainingService {
         }
 
         training.setManager(getManagerOrThrow(managerId));
+    }
+
+    private void validateTraining(TrainingRecordDTO trainingRecordDTO){
+        var errors = new LinkedHashMap<String, String>();
+        var initDate = parseDate(trainingRecordDTO.initDate());
+        var endDate = parseDate(trainingRecordDTO.endDate());
+
+        if(initDate == null){
+            errors.put("initDate", "Data de inicio invalida");
+        }
+
+        if(endDate == null){
+            errors.put("endDate", "Data de termino invalida");
+        }
+
+        if(initDate != null && endDate != null && endDate.isBefore(initDate)){
+            errors.put("endDate", "Data de termino deve ser posterior ou igual a data de inicio");
+        }
+
+        if(!errors.isEmpty()){
+            throw new FieldValidationException(errors);
+        }
+    }
+
+    private void applyNormalizedFields(TrainingModel training, TrainingRecordDTO trainingRecordDTO){
+        training.setTitle(trainingRecordDTO.title().trim());
+        training.setInitDate(normalizeDate(trainingRecordDTO.initDate()));
+        training.setEndDate(normalizeDate(trainingRecordDTO.endDate()));
+        training.setDescription(trainingRecordDTO.description().trim());
+    }
+
+    private String normalizeDate(String value){
+        return parseDate(value).format(DISPLAY_DATE_FORMATTER);
+    }
+
+    private LocalDate parseDate(String value){
+        if(value == null || value.isBlank()){
+            return null;
+        }
+
+        var trimmedValue = value.trim();
+
+        try {
+            return LocalDate.parse(trimmedValue, DateTimeFormatter.ISO_LOCAL_DATE);
+        } catch (DateTimeParseException ignored) {
+        }
+
+        try {
+            return LocalDate.parse(trimmedValue, DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+        } catch (DateTimeParseException ignored) {
+        }
+
+        if(trimmedValue.matches("\\d{2}/\\d{2}")){
+            try {
+                var parts = trimmedValue.split("/");
+                return LocalDate.of(
+                        LocalDate.now().getYear(),
+                        Integer.parseInt(parts[1]),
+                        Integer.parseInt(parts[0]));
+            } catch (DateTimeException | NumberFormatException ignored) {
+            }
+        }
+
+        return null;
     }
 }

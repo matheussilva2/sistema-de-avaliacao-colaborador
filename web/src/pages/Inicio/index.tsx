@@ -14,6 +14,7 @@ import {
   sortTrainingsStable,
   type ApiTraining,
 } from "../../services/trainingService";
+import { parseDateValue } from "../../utils/dateUtils";
 
 const recentTrainingsKeyPrefix = "recentTrainings";
 const hiddenStudentTrainingsKey = "hiddenStudentTrainings";
@@ -348,9 +349,9 @@ function isTrainingConcluded(endDate: string) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const trainingEndDate = new Date(`${endDate}T00:00:00`);
+  const trainingEndDate = parseDateValue(endDate);
 
-  if (Number.isNaN(trainingEndDate.getTime())) {
+  if (!trainingEndDate) {
     return false;
   }
 
@@ -408,9 +409,9 @@ function getDaysRemaining(endDate: string) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const trainingEndDate = new Date(`${endDate}T00:00:00`);
+  const trainingEndDate = parseDateValue(endDate);
 
-  if (Number.isNaN(trainingEndDate.getTime())) {
+  if (!trainingEndDate) {
     return 0;
   }
 

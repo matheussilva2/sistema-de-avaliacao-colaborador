@@ -1,19 +1,33 @@
 package com.avaliacao.api.service;
 
 import com.avaliacao.api.dtos.FormAnswerRecordDTO;
+import com.avaliacao.api.exceptions.FieldValidationException;
 import com.avaliacao.api.models.FormAnswerModel;
+import com.avaliacao.api.models.FormModel;
+import com.avaliacao.api.models.QuestionModel;
 import com.avaliacao.api.models.QuestionAnswerModel;
 import com.avaliacao.api.repositories.*;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
+import java.time.DateTimeException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class FormAnswerService {
+
+    private static final DateTimeFormatter DISPLAY_DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final DateTimeFormatter DISPLAY_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
 
     private final FormAnswerRepository formAnswerRepository;
     private final FormRepository formRepository;
@@ -44,6 +58,11 @@ public class FormAnswerService {
 
         var form = formO.get();
         var user = userO.get();
+        var formQuestions = questionRepository.findByFormIdForm(formId);
+
+        validateFormAvailability(form);
+        validateAnswerReferences(formId, formAnswerRecordDTO, formQuestions);
+
         var answer = new FormAnswerModel();
 
         answer.setForm(form);
@@ -81,7 +100,7 @@ public class FormAnswerService {
             answer.getQuestionAnswers().add(questionAnswer);
         }
 
-        int totalQuestions = questionRepository.findByFormIdForm(formId).size();
+        int totalQuestions = formQuestions.size();
         int scorePercentage = totalQuestions > 0
                 ? Math.round((correctAnswers * 100.0f) / totalQuestions)
                 : 0;
@@ -142,5 +161,129 @@ public class FormAnswerService {
 
         formAnswerRepository.delete(answerO.get());
         return true;
+    }
+
+    private void validateAnswerReferences(
+            UUID formId,
+            FormAnswerRecordDTO formAnswerRecordDTO,
+            List<QuestionModel> formQuestions){
+
+        var errors = new LinkedHashMap<String, String>();
+
+        if(formQuestions.isEmpty()){
+            errors.put("answers", "Formulario nao possui perguntas cadastradas");
+            throw new FieldValidationException(errors);
+        }
+
+        var expectedQuestionIds = formQuestions.stream()
+                .map(QuestionModel::getIdQuestion)
+                .collect(Collectors.toSet());
+        var answeredQuestionIds = new HashSet<UUID>();
+
+        for(int index = 0; index < formAnswerRecordDTO.answers().size(); index++){
+            var questionAnswerRecordDTO = formAnswerRecordDTO.answers().get(index);
+            var questionO = questionRepository.findById(questionAnswerRecordDTO.questionId());
+            var alternativeO = alternativeRepository.findById(questionAnswerRecordDTO.alternativeId());
+            var questionField = "answers[" + index + "].questionId";
+            var alternativeField = "answers[" + index + "].alternativeId";
+
+            if(!answeredQuestionIds.add(questionAnswerRecordDTO.questionId())){
+                errors.put(questionField, "Pergunta respondida mais de uma vez");
+            }
+
+            if(questionO.isEmpty()){
+                errors.put(questionField, "Pergunta nao encontrada");
+            } else if(!questionO.get().getForm().getIdForm().equals(formId)){
+                errors.put(questionField, "Pergunta nao pertence ao formulario");
+            }
+
+            if(alternativeO.isEmpty()){
+                errors.put(alternativeField, "Alternativa nao encontrada");
+            } else if(questionO.isPresent() &&
+                    !alternativeO.get().getQuestion().getIdQuestion().equals(questionO.get().getIdQuestion())){
+                errors.put(alternativeField, "Alternativa nao pertence a pergunta informada");
+            }
+        }
+
+        if(!answeredQuestionIds.containsAll(expectedQuestionIds)){
+            errors.put("answers", "Todas as perguntas do formulario devem ser respondidas");
+        }
+
+        if(!errors.isEmpty()){
+            throw new FieldValidationException(errors);
+        }
+    }
+
+    private void validateFormAvailability(FormModel form){
+        var initDate = parseDate(form.getInitDate());
+        var endDate = parseDate(form.getEndDate());
+
+        if(initDate == null || endDate == null){
+            return;
+        }
+
+        var initTime = parseTimeOrDefault(form.getInitTime(), LocalTime.MIN);
+        var endTime = parseTimeOrDefault(form.getEndTime(), LocalTime.of(23,59));
+        var availabilityStart = LocalDateTime.of(initDate, initTime);
+        var availabilityEnd = LocalDateTime.of(endDate, endTime).plusMinutes(1).minusNanos(1);
+        var now = LocalDateTime.now();
+
+        if(now.isBefore(availabilityStart)){
+            throwAvailabilityError("Formulario ainda nao esta disponivel");
+        }
+
+        if(now.isAfter(availabilityEnd)){
+            throwAvailabilityError("Prazo do formulario encerrado");
+        }
+    }
+
+    private void throwAvailabilityError(String message){
+        var errors = new LinkedHashMap<String, String>();
+        errors.put("availability", message);
+        throw new FieldValidationException(errors);
+    }
+
+    private LocalDate parseDate(String value){
+        if(value == null || value.isBlank()){
+            return null;
+        }
+
+        var trimmedValue = value.trim();
+
+        try {
+            return LocalDate.parse(trimmedValue, DateTimeFormatter.ISO_LOCAL_DATE);
+        } catch (DateTimeParseException ignored) {
+        }
+
+        try {
+            return LocalDate.parse(trimmedValue, DISPLAY_DATE_FORMATTER);
+        } catch (DateTimeParseException ignored) {
+        }
+
+        if(trimmedValue.matches("\\d{2}/\\d{2}")){
+            try {
+                var parts = trimmedValue.split("/");
+                return LocalDate.of(
+                        LocalDate.now().getYear(),
+                        Integer.parseInt(parts[1]),
+                        Integer.parseInt(parts[0]));
+            } catch (DateTimeException | NumberFormatException ignored) {
+            }
+        }
+
+        return null;
+    }
+
+    private LocalTime parseTimeOrDefault(String value, LocalTime defaultValue){
+        if(value == null || value.isBlank()){
+            return defaultValue;
+        }
+
+        try {
+            return LocalTime.parse(value.trim(), DISPLAY_TIME_FORMATTER);
+        } catch (DateTimeParseException ignored) {
+        }
+
+        return defaultValue;
     }
 }

@@ -4,6 +4,12 @@ import { Card, Input, Label, Button } from "@heroui/react";
 import { UserCircle2 } from "lucide-react";
 import { ApiRequestError, getAuthenticatedUser } from "../../../services/authService";
 import { createEmployeeForManager } from "../../../services/userService";
+import {
+  DATE_INPUT_PLACEHOLDER,
+  formatDateInput,
+  isCompleteDateValue,
+  parseDateValue,
+} from "../../../utils/dateUtils";
 
 export default function AdicionarColaborador() {
   const navigate = useNavigate();
@@ -25,7 +31,12 @@ export default function AdicionarColaborador() {
   const [errorMessage, setErrorMessage] = useState("");
 
   const handleFieldChange = (field: keyof typeof form, value: string) => {
-    const nextValue = field === "cpf" ? formatCpf(value) : value;
+    const nextValue =
+      field === "cpf"
+        ? formatCpf(value)
+        : field === "dataContratacao" || field === "dataRegistro"
+          ? formatDateInput(value)
+          : value;
 
     setForm((prev) => ({ ...prev, [field]: nextValue }));
     setFieldErrors((prev) => ({ ...prev, [field]: "" }));
@@ -52,6 +63,7 @@ export default function AdicionarColaborador() {
       return;
     }
 
+    setFieldErrors({});
     setIsLoading(true);
 
     const manager = getAuthenticatedUser();
@@ -78,9 +90,25 @@ export default function AdicionarColaborador() {
 
       navigate("/painel/colaboradores");
     } catch (error) {
-      if (error instanceof ApiRequestError && error.status === 409) {
-        setErrorMessage("Ja existe uma conta cadastrada com esse e-mail.");
-        setFieldErrors((prev) => ({ ...prev, email: "Ja existe uma conta cadastrada com esse e-mail." }));
+      if (error instanceof ApiRequestError) {
+        const apiFieldErrors = mapApiErrorsToCollaboratorForm(error.fieldErrors);
+
+        if (Object.keys(apiFieldErrors).length > 0) {
+          setFieldErrors((prev) => ({ ...prev, ...apiFieldErrors }));
+          setErrorMessage("Corrija os campos destacados antes de salvar.");
+          return;
+        }
+
+        if (error.status === 409) {
+          setErrorMessage("Ja existe uma conta cadastrada com esse e-mail.");
+          setFieldErrors((prev) => ({
+            ...prev,
+            email: "Ja existe uma conta cadastrada com esse e-mail.",
+          }));
+          return;
+        }
+
+        setErrorMessage(getCreateCollaboratorErrorMessage(error.message));
       } else {
         setErrorMessage("Nao foi possivel cadastrar o usuario. Confira os dados.");
       }
@@ -139,7 +167,7 @@ export default function AdicionarColaborador() {
           </Card>
         </div>
 
-        <form onSubmit={handleSave} className="col-span-12 xl:col-span-8 space-y-6">
+        <form onSubmit={handleSave} noValidate className="col-span-12 xl:col-span-8 space-y-6">
           <Card className="rounded-3xl bg-white shadow-sm overflow-hidden">
             <div className="bg-primary text-white px-6 py-4">
               <h2 className="font-semibold">Dados pessoais</h2>
@@ -158,6 +186,7 @@ export default function AdicionarColaborador() {
                   className="bg-white"
                   required
                 />
+                <FieldError message={fieldErrors.nome} />
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="sobrenome" className="text-primary-700 font-semibold text-sm">
@@ -172,6 +201,7 @@ export default function AdicionarColaborador() {
                   className="bg-white"
                   required
                 />
+                <FieldError message={fieldErrors.sobrenome} />
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="cpf" className="text-primary-700 font-semibold text-sm">
@@ -216,6 +246,7 @@ export default function AdicionarColaborador() {
                   className="bg-white"
                   required
                 />
+                <FieldError message={fieldErrors.telefone} />
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="senha" className="text-primary-700 font-semibold text-sm">
@@ -278,9 +309,12 @@ export default function AdicionarColaborador() {
                 </Label>
                 <Input
                   id="dataContratacao"
-                  type="date"
+                  type="text"
                   value={form.dataContratacao}
                   onChange={(e) => handleFieldChange("dataContratacao", e.target.value)}
+                  inputMode="numeric"
+                  maxLength={10}
+                  placeholder={DATE_INPUT_PLACEHOLDER}
                   className="bg-white"
                   required
                 />
@@ -292,9 +326,12 @@ export default function AdicionarColaborador() {
                 </Label>
                 <Input
                   id="dataRegistro"
-                  type="date"
+                  type="text"
                   value={form.dataRegistro}
                   onChange={(e) => handleFieldChange("dataRegistro", e.target.value)}
+                  inputMode="numeric"
+                  maxLength={10}
+                  placeholder={DATE_INPUT_PLACEHOLDER}
                   className="bg-white"
                   required
                 />
@@ -373,6 +410,14 @@ type CollaboratorForm = {
 function validateCollaboratorForm(form: CollaboratorForm, requirePassword: boolean) {
   const errors: Record<string, string> = {};
 
+  if (!form.nome.trim()) {
+    errors.nome = "Informe o nome.";
+  }
+
+  if (!form.sobrenome.trim()) {
+    errors.sobrenome = "Informe o sobrenome.";
+  }
+
   if (!isValidEmail(form.email)) {
     errors.email = "Informe um e-mail valido.";
   }
@@ -381,8 +426,14 @@ function validateCollaboratorForm(form: CollaboratorForm, requirePassword: boole
     errors.cpf = "Informe um CPF valido.";
   }
 
+  if (!isValidPhone(form.telefone)) {
+    errors.telefone = "Informe um telefone com 10 ou 11 digitos.";
+  }
+
   if (!form.dataRegistro) {
     errors.dataRegistro = "Informe a data de registro.";
+  } else if (!isCompleteDateValue(form.dataRegistro) || !parseDateValue(form.dataRegistro)) {
+    errors.dataRegistro = "Informe uma data de registro valida.";
   }
 
   if (!form.dataContratacao) {
@@ -425,15 +476,20 @@ function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+function isValidPhone(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  return digits.length === 10 || digits.length === 11;
+}
+
 function validateHireDate(hireDateValue: string, registrationDateValue: string) {
-  const hireDate = parseDate(hireDateValue);
-  const registrationDate = parseDate(registrationDateValue);
+  const hireDate = parseDateValue(hireDateValue);
+  const registrationDate = parseDateValue(registrationDateValue);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const thirtyYearsAgo = new Date(today);
   thirtyYearsAgo.setFullYear(today.getFullYear() - 30);
 
-  if (!hireDate) {
+  if (!isCompleteDateValue(hireDateValue) || !hireDate) {
     return "Informe uma data de contratacao valida.";
   }
 
@@ -450,15 +506,6 @@ function validateHireDate(hireDateValue: string, registrationDateValue: string) 
   }
 
   return "";
-}
-
-function parseDate(value: string) {
-  if (!value) {
-    return null;
-  }
-
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function isValidCpf(cpf: string) {
@@ -489,4 +536,62 @@ function formatCpf(value: string) {
     .replace(/(\d{3})(\d)/, "$1.$2")
     .replace(/(\d{3})(\d)/, "$1.$2")
     .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+}
+
+function mapApiErrorsToCollaboratorForm(apiErrors: Record<string, string>) {
+  const fieldMap: Record<string, keyof CollaboratorForm> = {
+    name: "nome",
+    lastName: "sobrenome",
+    cpf: "cpf",
+    email: "email",
+    phone: "telefone",
+    passWord: "senha",
+    hireDate: "dataContratacao",
+    registrationDate: "dataRegistro",
+  };
+
+  return Object.entries(apiErrors).reduce<Record<string, string>>(
+    (formErrors, [apiField, message]) => {
+      const formField = fieldMap[apiField];
+
+      if (formField) {
+        formErrors[formField] = normalizeApiErrorMessage(message);
+      }
+
+      return formErrors;
+    },
+    {},
+  );
+}
+
+function normalizeApiErrorMessage(message: string) {
+  if (message.includes("Ja existe uma conta")) {
+    return "Ja existe uma conta cadastrada com esse e-mail.";
+  }
+
+  if (message.includes("CPF invalido")) {
+    return "Informe um CPF valido.";
+  }
+
+  if (message.includes("Telefone")) {
+    return "Informe um telefone com 10 ou 11 digitos.";
+  }
+
+  if (message.includes("Senha")) {
+    return "A senha nao atende aos requisitos minimos.";
+  }
+
+  return message;
+}
+
+function getCreateCollaboratorErrorMessage(message: string) {
+  if (message.includes("Manager not found")) {
+    return "Faca login como gestor para cadastrar colaboradores.";
+  }
+
+  if (message.includes("Email already registered")) {
+    return "Ja existe uma conta cadastrada com esse e-mail.";
+  }
+
+  return "Nao foi possivel cadastrar o usuario. Confira os dados.";
 }

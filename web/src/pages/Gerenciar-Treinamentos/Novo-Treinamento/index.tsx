@@ -3,18 +3,27 @@ import { Button } from "@heroui/react";
 import { useNavigate } from "react-router-dom";
 import { BasicTrainingForm } from "./components/BasicTrainingForm";
 import type { TrainingFormData } from "./types";
-import { getAuthenticatedUser } from "../../../services/authService";
+import { ApiRequestError, getAuthenticatedUser } from "../../../services/authService";
 import {
   createTrainingForManager,
   type ApiTraining,
   updateTrainingImage,
 } from "../../../services/trainingService";
+import { useUndoableAction } from "../../../components/UndoDeleteProvider";
+import {
+  formatDateForDisplay,
+  formatDateInput,
+  isCompleteDateValue,
+  parseDateValue,
+} from "../../../utils/dateUtils";
 
 export default function CriarTreinamento() {
   const navigate = useNavigate();
+  const { scheduleUndoableAction } = useUndoableAction();
   const [trainingImage, setTrainingImage] = useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<TrainingFieldErrors>({});
 
   const [form, setForm] = useState<TrainingFormData>({
     title: "",
@@ -25,21 +34,25 @@ export default function CriarTreinamento() {
   });
 
   const handleChange = (field: keyof TrainingFormData, value: string) => {
+    const nextValue =
+      field === "startDate" || field === "endDate" ? formatDateInput(value) : value;
+
     setForm((prev) => ({
       ...prev,
-      [field]: value,
+      [field]: nextValue,
     }));
+    setFieldErrors((prev) => ({ ...prev, [field]: "" }));
   };
 
-  const buildTrainingPayload = () => ({
-    title: form.title,
-    workload: Number(form.hours),
-    initDate: form.startDate,
-    endDate: form.endDate,
-    description: form.description,
+  const buildTrainingPayload = (trainingForm: TrainingFormData) => ({
+    title: trainingForm.title,
+    workload: Number(trainingForm.hours),
+    initDate: trainingForm.startDate,
+    endDate: trainingForm.endDate,
+    description: trainingForm.description,
   });
 
-  const saveTraining = async () => {
+  const prepareTrainingCreation = () => {
     const manager = getAuthenticatedUser();
 
     if (!manager || manager.userRole !== "MANAGER") {
@@ -47,69 +60,115 @@ export default function CriarTreinamento() {
       return null;
     }
 
-    if (!form.title || !form.hours || !form.startDate || !form.endDate || !form.description) {
-      setErrorMessage("Preencha todos os dados do treinamento.");
+    const normalizedForm = normalizeTrainingForm(form);
+    const validationErrors = validateTrainingForm(normalizedForm);
+
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors);
+      setErrorMessage("Corrija os campos destacados antes de salvar o treinamento.");
       return null;
     }
 
-    if (Number(form.hours) <= 0) {
-      setErrorMessage("A carga horaria deve ser maior que zero.");
-      return null;
-    }
-
-    setIsSaving(true);
-    setErrorMessage("");
-
-    try {
-      const createdTraining = await createTrainingForManager(manager.id, buildTrainingPayload());
-
-      if (trainingImage) {
-        const imageDataUrl = await readFileAsDataUrl(trainingImage);
-        return await updateTrainingImage(createdTraining.idTraining, imageDataUrl);
-      }
-
-      return createdTraining;
-    } catch {
-      setErrorMessage("Nao foi possivel criar o treinamento. Verifique a API.");
-      return null;
-    } finally {
-      setIsSaving(false);
-    }
+    return {
+      managerId: manager.id,
+      normalizedForm,
+      payload: buildTrainingPayload(normalizedForm),
+    };
   };
 
-  const handleSubmit = async () => {
-    const newTraining = await saveTraining();
+  const scheduleTrainingCreation = (nextStep: "list" | "forms") => {
+    const preparedTraining = prepareTrainingCreation();
 
-    if (!newTraining) {
+    if (!preparedTraining) {
       return;
     }
 
-    navigate("/painel/gerenciar-treinamentos");
+    const imageSnapshot = trainingImage;
+
+    setIsSaving(true);
+    setErrorMessage("");
+    setFieldErrors({});
+
+    scheduleUndoableAction({
+      id: `training:create:${preparedTraining.managerId}`,
+      title: "Criacao de treinamento",
+      description: "O treinamento sera criado em 5 segundos.",
+      onStart: () => {
+        setForm(preparedTraining.normalizedForm);
+      },
+      onUndo: () => {
+        setIsSaving(false);
+      },
+      onCommit: async () => {
+        try {
+          const createdTraining = await createTrainingForManager(
+            preparedTraining.managerId,
+            preparedTraining.payload,
+          );
+          const savedTraining = imageSnapshot
+            ? await updateTrainingImage(
+                createdTraining.idTraining,
+                await readFileAsDataUrl(imageSnapshot),
+              )
+            : createdTraining;
+
+          if (nextStep === "forms") {
+            navigate("/painel/gerenciar-treinamentos/novo-treinamento/formularios", {
+              state: {
+                trainingDraft: buildFormsNavigationState(
+                  savedTraining,
+                  imageSnapshot?.name ?? null,
+                ),
+              },
+            });
+            return;
+          }
+
+          navigate("/painel/gerenciar-treinamentos");
+        } finally {
+          setIsSaving(false);
+        }
+      },
+      onCommitError: (error) => {
+        if (error instanceof ApiRequestError) {
+          const message = getCreateTrainingErrorMessage(error.message);
+          setErrorMessage(message.global);
+
+          const field = message.field;
+          const fieldMessage = message.fieldMessage;
+
+          if (field && fieldMessage) {
+            setFieldErrors((prev) => ({ ...prev, [field]: fieldMessage }));
+          }
+        } else {
+          setErrorMessage("Nao foi possivel criar o treinamento. Verifique a API.");
+        }
+      },
+    });
   };
 
-  const buildFormsNavigationState = (newTraining: ApiTraining) => ({
+  const handleSubmit = () => {
+    scheduleTrainingCreation("list");
+  };
+
+  const buildFormsNavigationState = (
+    newTraining: ApiTraining,
+    coverImageName: string | null,
+  ) => ({
     id: newTraining.idTraining,
     title: newTraining.title,
     hours: newTraining.workload,
-    startDate: newTraining.initDate,
-    endDate: newTraining.endDate,
+    startDate: formatDateForDisplay(newTraining.initDate),
+    endDate: formatDateForDisplay(newTraining.endDate),
     description: newTraining.description,
     progress: 0,
     daysLeft: 0,
     status: "em_andamento",
-    coverImageName: trainingImage?.name ?? null,
+    coverImageName,
   });
 
-  const handleSubmitAndCreateForms = async () => {
-    const newTraining = await saveTraining();
-
-    if (!newTraining) {
-      return;
-    }
-
-    navigate("/painel/gerenciar-treinamentos/novo-treinamento/formularios", {
-      state: { trainingDraft: buildFormsNavigationState(newTraining) },
-    });
+  const handleSubmitAndCreateForms = () => {
+    scheduleTrainingCreation("forms");
   };
 
   return (
@@ -118,8 +177,10 @@ export default function CriarTreinamento() {
         <BasicTrainingForm
           form={form}
           onChange={handleChange}
+          fieldErrors={fieldErrors}
           selectedImageName={trainingImage?.name}
           onImageChange={setTrainingImage}
+          isDisabled={isSaving}
         />
 
         <div className="rounded-md border border-primary-100 bg-white p-5 shadow-sm">
@@ -175,4 +236,99 @@ function readFileAsDataUrl(file: File) {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+type TrainingFieldErrors = Partial<Record<keyof TrainingFormData, string>>;
+
+function normalizeTrainingForm(form: TrainingFormData): TrainingFormData {
+  return {
+    title: form.title.trim(),
+    hours: form.hours.trim(),
+    startDate: formatDateForDisplay(form.startDate.trim()),
+    endDate: formatDateForDisplay(form.endDate.trim()),
+    description: form.description.trim(),
+  };
+}
+
+function validateTrainingForm(form: TrainingFormData) {
+  const errors: TrainingFieldErrors = {};
+  const workload = Number(form.hours);
+  const startDate = parseDateValue(form.startDate);
+  const endDate = parseDateValue(form.endDate);
+
+  if (!form.title) {
+    errors.title = "Informe o titulo do treinamento.";
+  }
+
+  if (!form.hours) {
+    errors.hours = "Informe a carga horaria.";
+  } else if (!Number.isFinite(workload) || workload <= 0) {
+    errors.hours = "A carga horaria deve ser maior que zero.";
+  } else if (!Number.isInteger(workload)) {
+    errors.hours = "Informe a carga horaria em horas inteiras.";
+  }
+
+  if (!form.startDate) {
+    errors.startDate = "Informe a data de inicio.";
+  } else if (!isCompleteDateValue(form.startDate) || !startDate) {
+    errors.startDate = "Informe uma data de inicio valida.";
+  }
+
+  if (!form.endDate) {
+    errors.endDate = "Informe a data de termino.";
+  } else if (!isCompleteDateValue(form.endDate) || !endDate) {
+    errors.endDate = "Informe uma data de termino valida.";
+  }
+
+  if (startDate && endDate && endDate < startDate) {
+    errors.endDate = "A data de termino nao pode ser anterior a data de inicio.";
+  }
+
+  if (!form.description) {
+    errors.description = "Informe a descricao do treinamento.";
+  }
+
+  return errors;
+}
+
+function getCreateTrainingErrorMessage(message: string): {
+  field?: keyof TrainingFormData;
+  fieldMessage?: string;
+  global: string;
+} {
+  if (message.includes("Workload must be greater than zero")) {
+    return {
+      field: "hours",
+      fieldMessage: "A carga horaria deve ser maior que zero.",
+      global: "Corrija os campos destacados antes de salvar o treinamento.",
+    };
+  }
+
+  if (message.includes("Invalid start date")) {
+    return {
+      field: "startDate",
+      fieldMessage: "Informe uma data de inicio valida.",
+      global: "Corrija os campos destacados antes de salvar o treinamento.",
+    };
+  }
+
+  if (message.includes("Invalid end date") || message.includes("End date cannot be before start date")) {
+    return {
+      field: "endDate",
+      fieldMessage: message.includes("before start date")
+        ? "A data de termino nao pode ser anterior a data de inicio."
+        : "Informe uma data de termino valida.",
+      global: "Corrija os campos destacados antes de salvar o treinamento.",
+    };
+  }
+
+  if (message.includes("Manager not found")) {
+    return {
+      global: "Faca login como gestor para criar treinamentos.",
+    };
+  }
+
+  return {
+    global: "Nao foi possivel criar o treinamento. Verifique os dados informados.",
+  };
 }

@@ -31,6 +31,7 @@ public class QuestionService {
 
         var question = new QuestionModel();
         BeanUtils.copyProperties(questionRecordDTO,question);
+        question.setTitle(questionRecordDTO.title().trim());
         question.setForm(formO.get());
 
         return Optional.of(questionRepository.save(question));
@@ -63,6 +64,7 @@ public class QuestionService {
 
         var question = questionO.get();
         BeanUtils.copyProperties(questionRecordDTO,question);
+        question.setTitle(questionRecordDTO.title().trim());
 
         return Optional.of(questionRepository.save(question));
     }

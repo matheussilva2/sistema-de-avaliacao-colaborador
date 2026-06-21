@@ -7,6 +7,8 @@ export type ManagedTrainingForm = {
   type: TestType;
   startDeadline: string;
   endDeadline: string;
+  startTime: string;
+  endTime: string;
   minCorrect: string;
   questions: Question[];
 };
@@ -31,8 +33,10 @@ export const managedTrainingFormsMock: ManagedTrainingForm[] = [
     trainingId: 1,
     title: "Diagnostico inicial LGPD",
     type: "pre-teste",
-    startDeadline: "2026-05-10",
-    endDeadline: "2026-05-18",
+    startDeadline: "10/05/2026",
+    endDeadline: "18/05/2026",
+    startTime: "08:00",
+    endTime: "18:00",
     minCorrect: "50",
     questions: [
       {
@@ -74,8 +78,10 @@ export const managedTrainingFormsMock: ManagedTrainingForm[] = [
     trainingId: 1,
     title: "Avaliacao final LGPD",
     type: "pos-teste",
-    startDeadline: "2026-06-20",
-    endDeadline: "2026-06-30",
+    startDeadline: "20/06/2026",
+    endDeadline: "30/06/2026",
+    startTime: "08:00",
+    endTime: "18:00",
     minCorrect: "70",
     questions: [
       {

@@ -6,18 +6,20 @@ import { getAuthenticatedUser } from "../../../services/authService";
 import {
   clearEmployeeTrash,
   getTrashedEmployees,
+  moveEmployeeToTrash,
   removeEmployeeFromTrash,
   restoreEmployeeFromTrash,
   type TrashedEmployee,
 } from "../../../services/employeeTrashService";
 import { deleteUser } from "../../../services/userService";
+import { useUndoableDelete } from "../../../components/UndoDeleteProvider";
 
 export default function LixeiraColaboradores() {
   const navigate = useNavigate();
   const [managerId, setManagerId] = useState("");
   const [trashedEmployees, setTrashedEmployees] = useState<TrashedEmployee[]>([]);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const { scheduleUndoableDelete } = useUndoableDelete();
 
   useEffect(() => {
     const manager = getAuthenticatedUser();
@@ -36,38 +38,70 @@ export default function LixeiraColaboradores() {
     setTrashedEmployees(nextTrash);
   };
 
-  const handleDeleteOne = async (userId: string) => {
-    setIsDeleting(true);
+  const handleDeleteOne = (userId: string) => {
+    const trashedEmployee = trashedEmployees.find((item) => item.user.id === userId);
+
+    if (!trashedEmployee) {
+      return;
+    }
+
     setErrorMessage("");
 
-    try {
-      await deleteUser(userId);
-      const nextTrash = removeEmployeeFromTrash(managerId, userId);
-      setTrashedEmployees(nextTrash);
-    } catch {
-      setErrorMessage("Nao foi possivel excluir definitivamente este colaborador.");
-    } finally {
-      setIsDeleting(false);
-    }
+    scheduleUndoableDelete({
+      id: `employee-trash:${userId}`,
+      title: "Colaborador excluido",
+      description: `${trashedEmployee.user.name} ${trashedEmployee.user.lastName} sera excluido definitivamente em 5 segundos.`,
+      onStart: () => {
+        setTrashedEmployees(removeEmployeeFromTrash(managerId, userId));
+      },
+      onUndo: () => {
+        setTrashedEmployees(moveEmployeeToTrash(managerId, trashedEmployee.user));
+      },
+      onCommit: async () => {
+        await deleteUser(userId);
+      },
+      onCommitError: () => {
+        setTrashedEmployees(moveEmployeeToTrash(managerId, trashedEmployee.user));
+        setErrorMessage("Nao foi possivel excluir definitivamente este colaborador.");
+      },
+    });
   };
 
-  const handleEmptyTrash = async () => {
+  const handleEmptyTrash = () => {
     if (trashedEmployees.length === 0) {
       return;
     }
 
-    setIsDeleting(true);
+    const trashSnapshot = [...trashedEmployees];
     setErrorMessage("");
 
-    try {
-      await Promise.all(trashedEmployees.map((item) => deleteUser(item.user.id)));
-      clearEmployeeTrash(managerId);
-      setTrashedEmployees([]);
-    } catch {
-      setErrorMessage("Nao foi possivel esvaziar toda a lixeira.");
-    } finally {
-      setIsDeleting(false);
-    }
+    scheduleUndoableDelete({
+      id: `employee-trash:empty:${managerId}`,
+      title: "Lixeira esvaziada",
+      description: `${trashSnapshot.length} colaborador(es) serao excluidos definitivamente em 5 segundos.`,
+      onStart: () => {
+        clearEmployeeTrash(managerId);
+        setTrashedEmployees([]);
+      },
+      onUndo: () => {
+        trashSnapshot
+          .slice()
+          .reverse()
+          .forEach((item) => moveEmployeeToTrash(managerId, item.user));
+        setTrashedEmployees(trashSnapshot);
+      },
+      onCommit: async () => {
+        await Promise.all(trashSnapshot.map((item) => deleteUser(item.user.id)));
+      },
+      onCommitError: () => {
+        trashSnapshot
+          .slice()
+          .reverse()
+          .forEach((item) => moveEmployeeToTrash(managerId, item.user));
+        setTrashedEmployees(trashSnapshot);
+        setErrorMessage("Nao foi possivel esvaziar toda a lixeira.");
+      },
+    });
   };
 
   return (
@@ -93,7 +127,7 @@ export default function LixeiraColaboradores() {
           </Button>
           <Button
             className="bg-red-600 text-white"
-            isDisabled={isDeleting || trashedEmployees.length === 0}
+            isDisabled={trashedEmployees.length === 0}
             onPress={handleEmptyTrash}
           >
             <Trash2 size={16} />
@@ -139,7 +173,6 @@ export default function LixeiraColaboradores() {
               <div className="flex flex-wrap gap-2">
                 <Button
                   className="bg-primary text-white"
-                  isDisabled={isDeleting}
                   onPress={() => handleRestore(user.id)}
                 >
                   <Undo2 size={16} />
@@ -147,7 +180,6 @@ export default function LixeiraColaboradores() {
                 </Button>
                 <Button
                   className="bg-red-600 text-white"
-                  isDisabled={isDeleting}
                   onPress={() => handleDeleteOne(user.id)}
                 >
                   <Trash2 size={16} />

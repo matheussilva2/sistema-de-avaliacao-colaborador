@@ -36,8 +36,14 @@ public class UserController {
                     .status(HttpStatus.CREATED)
                     .body(userService.create(userRecordDTO));
         } catch (IllegalArgumentException exception) {
+            if(exception.getMessage().equals("Email already registered.")){
+                return ResponseEntity
+                        .status(HttpStatus.CONFLICT)
+                        .body(exception.getMessage());
+            }
+
             return ResponseEntity
-                    .status(HttpStatus.CONFLICT)
+                    .status(HttpStatus.BAD_REQUEST)
                     .body(exception.getMessage());
         }
     }

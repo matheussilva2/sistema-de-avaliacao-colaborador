@@ -12,6 +12,11 @@ import {
   type ApiFormType,
 } from "../../../services/formService";
 import { getTrashedFormIds } from "../../../services/formTrashService";
+import {
+  formatDateForDisplay,
+  formatDateTimeForDisplay,
+  getAvailabilityStatus,
+} from "../../../utils/dateUtils";
 
 const recentTrainingsKeyPrefix = "recentTrainings";
 
@@ -122,12 +127,12 @@ export default function TreinamentoAluno() {
 
             <div className="bg-primary-50 p-4 rounded-md">
               <span className="text-sm text-neutral-600">Inicio</span>
-              <p className="font-bold text-lg">{training.initDate}</p>
+              <p className="font-bold text-lg">{formatDateForDisplay(training.initDate)}</p>
             </div>
 
             <div className="bg-primary-50 p-4 rounded-md">
               <span className="text-sm text-neutral-600">Termino</span>
-              <p className="font-bold text-lg">{training.endDate}</p>
+              <p className="font-bold text-lg">{formatDateForDisplay(training.endDate)}</p>
             </div>
           </div>
 
@@ -183,49 +188,13 @@ function FormsList({
   return (
     <div className="grid gap-4">
       {forms.map((form) => (
-        <Card key={form.idForm} className="p-6 border border-gray-200">
-          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div>
-              <span className="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary">
-                {formTypeLabel(form.formType)}
-              </span>
-              <h3 className="mt-3 text-lg font-semibold text-neutral-900">
-                {form.title}
-              </h3>
-              <div className="mt-4 grid gap-3 text-sm text-neutral-600 md:grid-cols-3">
-                <div>
-                  <span>Inicio</span>
-                  <p className="font-semibold text-neutral-900">{form.initDate}</p>
-                </div>
-                <div>
-                  <span>Prazo final</span>
-                  <p className="font-semibold text-neutral-900">{form.endDate}</p>
-                </div>
-                <div>
-                  <span>Minimo</span>
-                  <p className="font-semibold text-neutral-900">
-                    {form.minCorrectPercentage}%
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col items-start gap-3 md:items-end">
-              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                Pendente
-              </span>
-
-              <Button
-                className="bg-primary text-white"
-                onPress={() =>
-                  navigate(`/painel/treinamentos/${trainingId}/formularios/${form.idForm}`)
-                }
-              >
-                Responder formulario
-              </Button>
-            </div>
-          </div>
-        </Card>
+        <StudentFormCard
+          key={form.idForm}
+          form={form}
+          onOpen={() =>
+            navigate(`/painel/treinamentos/${trainingId}/formularios/${form.idForm}`)
+          }
+        />
       ))}
 
       {forms.length === 0 && (
@@ -237,6 +206,71 @@ function FormsList({
         </Card>
       )}
     </div>
+  );
+}
+
+function StudentFormCard({
+  form,
+  onOpen,
+}: {
+  form: StudentFormSummary;
+  onOpen: () => void;
+}) {
+  const availabilityStatus = getAvailabilityStatus(
+    form.initDate,
+    form.initTime,
+    form.endDate,
+    form.endTime,
+  );
+  const isAvailable = availabilityStatus === "available";
+
+  return (
+    <Card className="p-6 border border-gray-200">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div>
+          <span className="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary">
+            {formTypeLabel(form.formType)}
+          </span>
+          <h3 className="mt-3 text-lg font-semibold text-neutral-900">
+            {form.title}
+          </h3>
+          <div className="mt-4 grid gap-3 text-sm text-neutral-600 md:grid-cols-3">
+            <div>
+              <span>Inicio</span>
+              <p className="font-semibold text-neutral-900">
+                {formatDateTimeForDisplay(form.initDate, form.initTime, "00:00")}
+              </p>
+            </div>
+            <div>
+              <span>Prazo final</span>
+              <p className="font-semibold text-neutral-900">
+                {formatDateTimeForDisplay(form.endDate, form.endTime, "23:59")}
+              </p>
+            </div>
+            <div>
+              <span>Minimo</span>
+              <p className="font-semibold text-neutral-900">
+                {form.minCorrectPercentage}%
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-start gap-3 md:items-end">
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${getAvailabilityBadgeClass(availabilityStatus)}`}>
+            {getAvailabilityLabel(availabilityStatus)}
+          </span>
+
+          <Button
+            className={isAvailable ? "bg-primary text-white" : "bg-neutral-200 text-neutral-600"}
+            isDisabled={!isAvailable}
+            onPress={onOpen}
+          >
+            {isAvailable ? "Responder formulario" : getAvailabilityButtonLabel(availabilityStatus)}
+          </Button>
+        </div>
+      </div>
+    </Card>
   );
 }
 
@@ -322,6 +356,34 @@ function Resultados({
 
 function formTypeLabel(type: ApiFormType) {
   return type === "PRE_TEST" ? "Pre-teste" : "Pos-teste";
+}
+
+function getAvailabilityLabel(status: ReturnType<typeof getAvailabilityStatus>) {
+  if (status === "upcoming") {
+    return "Nao liberado";
+  }
+
+  if (status === "expired") {
+    return "Prazo encerrado";
+  }
+
+  return "Disponivel";
+}
+
+function getAvailabilityButtonLabel(status: ReturnType<typeof getAvailabilityStatus>) {
+  return status === "upcoming" ? "Aguardando liberacao" : "Prazo encerrado";
+}
+
+function getAvailabilityBadgeClass(status: ReturnType<typeof getAvailabilityStatus>) {
+  if (status === "upcoming") {
+    return "bg-yellow-50 text-yellow-700";
+  }
+
+  if (status === "expired") {
+    return "bg-red-50 text-red-700";
+  }
+
+  return "bg-blue-50 text-blue-700";
 }
 
 function TrainingDetailSkeleton() {

@@ -1,7 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Card, Input, Label, Button, Skeleton } from "@heroui/react";
-import { Undo2, X } from "lucide-react";
 import {
   ApiRequestError,
   getAuthenticatedUser,
@@ -16,11 +15,14 @@ import {
   moveEmployeeToTrash,
   restoreEmployeeFromTrash,
 } from "../../../services/employeeTrashService";
-
-type PendingUndo = {
-  managerId: string;
-  user: ApiUser;
-};
+import { useUndoableDelete } from "../../../components/UndoDeleteProvider";
+import {
+  DATE_INPUT_PLACEHOLDER,
+  formatDateForDisplay,
+  formatDateInput,
+  isCompleteDateValue,
+  parseDateValue,
+} from "../../../utils/dateUtils";
 
 export default function ColaboradorDetalhe() {
   const { id } = useParams();
@@ -29,8 +31,8 @@ export default function ColaboradorDetalhe() {
   const [user, setUser] = useState<ApiUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const { scheduleUndoableAction, scheduleUndoableDelete } = useUndoableDelete();
   const [form, setForm] = useState({
     nome: "",
     sobrenome: "",
@@ -63,8 +65,8 @@ export default function ColaboradorDetalhe() {
           telefone: userData.phone,
           senha: "",
           confirmarSenha: "",
-          dataContratacao: userData.hireDate ?? "",
-          dataRegistro: userData.registrationDate ?? "",
+          dataContratacao: formatDateForDisplay(userData.hireDate),
+          dataRegistro: formatDateForDisplay(userData.registrationDate),
           userRole: userData.userRole,
           situacao: userData.active ? "Ativo" : "Inativo",
         });
@@ -78,20 +80,13 @@ export default function ColaboradorDetalhe() {
     loadUser();
   }, [id]);
 
-  useEffect(() => {
-    if (!pendingUndo) {
-      return;
-    }
-
-    const undoTimer = window.setTimeout(() => {
-      navigate("/painel/colaboradores");
-    }, 5000);
-
-    return () => window.clearTimeout(undoTimer);
-  }, [navigate, pendingUndo]);
-
   const handleFieldChange = (field: keyof typeof form, value: string) => {
-    const nextValue = field === "cpf" ? formatCpf(value) : value;
+    const nextValue =
+      field === "cpf"
+        ? formatCpf(value)
+        : field === "dataContratacao" || field === "dataRegistro"
+          ? formatDateInput(value)
+          : value;
 
     setForm((prev) => ({ ...prev, [field]: nextValue }));
     setFieldErrors((prev) => ({ ...prev, [field]: "" }));
@@ -100,7 +95,7 @@ export default function ColaboradorDetalhe() {
   const handleSave = async (event: FormEvent) => {
     event.preventDefault();
 
-    if (!id) {
+    if (!id || !user) {
       return;
     }
 
@@ -115,33 +110,75 @@ export default function ColaboradorDetalhe() {
       return;
     }
 
-    try {
-      const updatedUser = await updateUser(id, {
-        name: form.nome,
-        lastName: form.sobrenome,
-        cpf: form.cpf,
-        email: form.email,
-        phone: form.telefone,
-        passWord: form.senha || undefined,
-        hireDate: form.dataContratacao,
-        registrationDate: form.dataRegistro,
-        userRole: "EMPLOYEE",
-        active: form.situacao === "Ativo",
-      });
+    const previousUser = user;
+    const previousForm = { ...form };
+    const payload = {
+      name: form.nome,
+      lastName: form.sobrenome,
+      cpf: form.cpf,
+      email: form.email,
+      phone: form.telefone,
+      passWord: form.senha || undefined,
+      hireDate: form.dataContratacao,
+      registrationDate: form.dataRegistro,
+      userRole: "EMPLOYEE" as const,
+      active: form.situacao === "Ativo",
+    };
+    const optimisticUser: ApiUser = {
+      ...user,
+      name: form.nome,
+      lastName: form.sobrenome,
+      cpf: form.cpf,
+      email: form.email,
+      phone: form.telefone,
+      hireDate: form.dataContratacao,
+      registrationDate: form.dataRegistro,
+      userRole: "EMPLOYEE",
+      active: form.situacao === "Ativo",
+    };
 
-      setUser(updatedUser);
-      navigate("/painel/colaboradores");
-    } catch (error) {
-      if (error instanceof ApiRequestError && error.status === 409) {
-        const message = getUpdateConflictMessage(error.message);
-        setErrorMessage(message.global);
-        setFieldErrors((prev) => ({ ...prev, [message.field]: message.fieldMessage }));
-      } else {
-        setErrorMessage("Nao foi possivel salvar as alteracoes.");
-      }
-    } finally {
-      setIsSaving(false);
-    }
+    scheduleUndoableAction({
+      id: `collaborator:update:${id}`,
+      title: "Alteracoes do colaborador",
+      description: "Os dados do colaborador serao salvos em 5 segundos.",
+      onStart: () => {
+        setUser(optimisticUser);
+        setForm((prev) => ({
+          ...prev,
+          senha: "",
+          confirmarSenha: "",
+        }));
+        setFieldErrors({});
+      },
+      onUndo: () => {
+        setUser(previousUser);
+        setForm(previousForm);
+        setIsSaving(false);
+        setErrorMessage("");
+      },
+      onCommit: async () => {
+        try {
+          const updatedUser = await updateUser(id, payload);
+
+          setUser(updatedUser);
+          navigate("/painel/colaboradores");
+        } finally {
+          setIsSaving(false);
+        }
+      },
+      onCommitError: (error) => {
+        setUser(previousUser);
+        setForm(previousForm);
+
+        if (error instanceof ApiRequestError && error.status === 409) {
+          const message = getUpdateConflictMessage(error.message);
+          setErrorMessage(message.global);
+          setFieldErrors((prev) => ({ ...prev, [message.field]: message.fieldMessage }));
+        } else {
+          setErrorMessage("Nao foi possivel salvar as alteracoes.");
+        }
+      },
+    });
   };
 
   const handleDelete = () => {
@@ -152,17 +189,20 @@ export default function ColaboradorDetalhe() {
       return;
     }
 
-    moveEmployeeToTrash(manager.id, user);
-    setPendingUndo({ managerId: manager.id, user });
-  };
-
-  const handleUndoDelete = () => {
-    if (!pendingUndo) {
-      return;
-    }
-
-    restoreEmployeeFromTrash(pendingUndo.managerId, pendingUndo.user.id);
-    setPendingUndo(null);
+    scheduleUndoableDelete({
+      id: `employee:${user.id}`,
+      title: "Colaborador movido para a lixeira",
+      description: "Voce pode desfazer esta movimentacao em ate 5 segundos.",
+      onStart: () => {
+        moveEmployeeToTrash(manager.id, user);
+        navigate("/painel/colaboradores");
+      },
+      onUndo: () => {
+        restoreEmployeeFromTrash(manager.id, user.id);
+        navigate(`/painel/colaboradores/${user.id}`);
+      },
+      onCommit: () => undefined,
+    });
   };
 
   if (isLoading) {
@@ -235,6 +275,7 @@ export default function ColaboradorDetalhe() {
                 type="text"
                 className="bg-white"
                 value={form.nome}
+                disabled={isSaving}
                 onChange={(e) => handleFieldChange("nome", e.target.value)}
                 required
               />
@@ -249,6 +290,7 @@ export default function ColaboradorDetalhe() {
                 type="text"
                 className="bg-white"
                 value={form.sobrenome}
+                disabled={isSaving}
                 onChange={(e) => handleFieldChange("sobrenome", e.target.value)}
                 required
               />
@@ -263,6 +305,7 @@ export default function ColaboradorDetalhe() {
                 type="text"
                 className="bg-white"
                 value={form.cpf}
+                disabled={isSaving}
                 onChange={(e) => handleFieldChange("cpf", e.target.value)}
                 required
               />
@@ -278,6 +321,7 @@ export default function ColaboradorDetalhe() {
                 type="email"
                 className="bg-white"
                 value={form.email}
+                disabled={isSaving}
                 onChange={(e) => handleFieldChange("email", e.target.value)}
                 required
               />
@@ -293,6 +337,7 @@ export default function ColaboradorDetalhe() {
                 type="tel"
                 className="bg-white"
                 value={form.telefone}
+                disabled={isSaving}
                 onChange={(e) => handleFieldChange("telefone", e.target.value)}
                 required
               />
@@ -307,6 +352,7 @@ export default function ColaboradorDetalhe() {
                 type="password"
                 className="bg-white"
                 value={form.senha}
+                disabled={isSaving}
                 onChange={(e) => handleFieldChange("senha", e.target.value)}
                 placeholder="Opcional"
               />
@@ -323,6 +369,7 @@ export default function ColaboradorDetalhe() {
                 type="password"
                 className="bg-white"
                 value={form.confirmarSenha}
+                disabled={isSaving}
                 onChange={(e) => handleFieldChange("confirmarSenha", e.target.value)}
                 placeholder="Repita apenas se alterar a senha"
               />
@@ -335,10 +382,14 @@ export default function ColaboradorDetalhe() {
               </Label>
               <Input
                 id="profile_data_contratacao_input"
-                type="date"
+                type="text"
                 className="bg-white"
                 value={form.dataContratacao}
+                disabled={isSaving}
                 onChange={(e) => handleFieldChange("dataContratacao", e.target.value)}
+                inputMode="numeric"
+                maxLength={10}
+                placeholder={DATE_INPUT_PLACEHOLDER}
                 required
               />
               <FieldError message={fieldErrors.dataContratacao} />
@@ -350,10 +401,14 @@ export default function ColaboradorDetalhe() {
               </Label>
               <Input
                 id="profile_data_registro_input"
-                type="date"
+                type="text"
                 className="bg-white"
                 value={form.dataRegistro}
+                disabled={isSaving}
                 onChange={(e) => handleFieldChange("dataRegistro", e.target.value)}
+                inputMode="numeric"
+                maxLength={10}
+                placeholder={DATE_INPUT_PLACEHOLDER}
                 required
               />
               <FieldError message={fieldErrors.dataRegistro} />
@@ -375,6 +430,7 @@ export default function ColaboradorDetalhe() {
               <Input
                 value="Colaborador"
                 className="bg-white"
+                disabled={isSaving}
                 readOnly
               />
             </div>
@@ -383,6 +439,7 @@ export default function ColaboradorDetalhe() {
               <Label className="text-primary-700 font-semibold text-sm">Situacao</Label>
               <select
                 value={form.situacao}
+                disabled={isSaving}
                 onChange={(e) => handleFieldChange("situacao", e.target.value)}
                 className="bg-white border rounded-xl h-10 px-3"
               >
@@ -406,7 +463,11 @@ export default function ColaboradorDetalhe() {
             </p>
           )}
           <div className="flex flex-col md:flex-row justify-end gap-3">
-          <Button className="bg-red-500 text-white font-semibold px-8" onPress={handleDelete}>
+          <Button
+            className="bg-red-500 text-white font-semibold px-8"
+            isDisabled={isSaving}
+            onPress={handleDelete}
+          >
             Deletar usuario
           </Button>
           <Button
@@ -419,41 +480,6 @@ export default function ColaboradorDetalhe() {
           </div>
         </div>
       </form>
-
-      {pendingUndo && (
-        <div className="fixed bottom-6 right-6 z-50 w-[min(420px,calc(100vw-3rem))] rounded-md border border-gray-200 bg-white p-4 shadow-xl">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="font-semibold text-neutral-900">
-                Colaborador movido para a lixeira
-              </p>
-              <p className="mt-1 text-sm text-neutral-600">
-                {pendingUndo.user.name} {pendingUndo.user.lastName} sera mantido na
-                lixeira ate a exclusao definitiva.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setPendingUndo(null)}
-              className="rounded-md p-1 text-neutral-500 transition hover:bg-gray-100 hover:text-neutral-900"
-              aria-label="Fechar aviso"
-            >
-              <X size={18} />
-            </button>
-          </div>
-
-          <div className="mt-4 flex justify-end">
-            <Button
-              className="bg-primary text-white"
-              onPress={handleUndoDelete}
-            >
-              <Undo2 size={16} />
-              Desfazer
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -509,6 +535,8 @@ function validateCollaboratorForm(
 
   if (!form.dataRegistro) {
     errors.dataRegistro = "Informe a data de registro.";
+  } else if (!isCompleteDateValue(form.dataRegistro) || !parseDateValue(form.dataRegistro)) {
+    errors.dataRegistro = "Informe uma data de registro valida.";
   }
 
   if (!form.dataContratacao) {
@@ -552,14 +580,14 @@ function isValidEmail(email: string) {
 }
 
 function validateHireDate(hireDateValue: string, registrationDateValue: string) {
-  const hireDate = parseDate(hireDateValue);
-  const registrationDate = parseDate(registrationDateValue);
+  const hireDate = parseDateValue(hireDateValue);
+  const registrationDate = parseDateValue(registrationDateValue);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const thirtyYearsAgo = new Date(today);
   thirtyYearsAgo.setFullYear(today.getFullYear() - 30);
 
-  if (!hireDate) {
+  if (!isCompleteDateValue(hireDateValue) || !hireDate) {
     return "Informe uma data de contratacao valida.";
   }
 
@@ -576,15 +604,6 @@ function validateHireDate(hireDateValue: string, registrationDateValue: string) 
   }
 
   return "";
-}
-
-function parseDate(value: string) {
-  if (!value) {
-    return null;
-  }
-
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function isValidCpf(cpf: string) {

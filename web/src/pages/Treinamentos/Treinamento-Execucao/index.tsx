@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button, Card, Skeleton } from "@heroui/react";
 import { getTrainingById, type ApiTraining } from "../../../services/trainingService";
-import { getAuthenticatedUser } from "../../../services/authService";
+import { ApiRequestError, getAuthenticatedUser } from "../../../services/authService";
 import {
   createFormAnswer,
   getFormUserAnswers,
@@ -11,6 +11,10 @@ import {
   type ApiFormType,
   type ApiFormWithQuestions,
 } from "../../../services/formService";
+import {
+  formatDateTimeForDisplay,
+  getAvailabilityStatus,
+} from "../../../utils/dateUtils";
 
 export default function TreinamentoExecucao() {
   const { id, formId } = useParams();
@@ -84,7 +88,11 @@ export default function TreinamentoExecucao() {
     loadForm();
   }, [formId, id]);
 
-  const isReadOnly = Boolean(submittedAnswer);
+  const availabilityStatus = form
+    ? getAvailabilityStatus(form.initDate, form.initTime, form.endDate, form.endTime)
+    : "available";
+  const isUnavailable = !submittedAnswer && availabilityStatus !== "available";
+  const isReadOnly = Boolean(submittedAnswer) || isUnavailable;
 
   const allAnswered = useMemo(
     () => Boolean(form?.questions.every((question) => answers[question.idQuestion])),
@@ -100,6 +108,11 @@ export default function TreinamentoExecucao() {
     event.preventDefault();
 
     if (!form) return;
+
+    if (isUnavailable) {
+      setErrorMessage(getAvailabilityMessage(availabilityStatus));
+      return;
+    }
 
     const currentUser = getAuthenticatedUser();
 
@@ -120,8 +133,12 @@ export default function TreinamentoExecucao() {
       });
 
       setSubmittedAnswer(savedAnswer);
-    } catch {
-      setErrorMessage("Nao foi possivel enviar as respostas.");
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.fieldErrors.availability) {
+        setErrorMessage(error.fieldErrors.availability);
+      } else {
+        setErrorMessage("Nao foi possivel enviar as respostas.");
+      }
     } finally {
       setIsSaving(false);
     }
@@ -174,11 +191,15 @@ export default function TreinamentoExecucao() {
         <div className="mt-5 grid gap-3 md:grid-cols-3">
           <div className="rounded-md bg-primary-50 p-4">
             <p className="text-sm text-neutral-600">Inicio</p>
-            <p className="font-bold text-neutral-900">{form.initDate}</p>
+            <p className="font-bold text-neutral-900">
+              {formatDateTimeForDisplay(form.initDate, form.initTime, "00:00")}
+            </p>
           </div>
           <div className="rounded-md bg-primary-50 p-4">
             <p className="text-sm text-neutral-600">Prazo final</p>
-            <p className="font-bold text-neutral-900">{form.endDate}</p>
+            <p className="font-bold text-neutral-900">
+              {formatDateTimeForDisplay(form.endDate, form.endTime, "23:59")}
+            </p>
           </div>
           <div className="rounded-md bg-primary-50 p-4">
             <p className="text-sm text-neutral-600">Minimo</p>
@@ -187,8 +208,14 @@ export default function TreinamentoExecucao() {
         </div>
       </Card>
 
+      {isUnavailable && (
+        <Card className="mb-6 border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800">
+          {getAvailabilityMessage(availabilityStatus)}
+        </Card>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-6">
-        {form.questions.map((question, questionIndex) => (
+        {!isUnavailable && form.questions.map((question, questionIndex) => (
           <Card key={question.idQuestion} className="p-6 border border-gray-200">
             <p className="font-semibold mb-4">
               {questionIndex + 1}. {question.title}
@@ -246,7 +273,7 @@ export default function TreinamentoExecucao() {
           </Card>
         ))}
 
-        {form.questions.length === 0 && (
+        {!isUnavailable && form.questions.length === 0 && (
           <Card className="p-6 border border-dashed border-primary-200">
             <p className="font-semibold text-primary">Formulario sem perguntas</p>
             <p className="mt-1 text-sm text-neutral-600">
@@ -273,7 +300,7 @@ export default function TreinamentoExecucao() {
             <Button
               type="submit"
               className="bg-primary text-white px-6 py-3 rounded-lg"
-              isDisabled={!allAnswered || isSaving}
+              isDisabled={!allAnswered || isSaving || isUnavailable}
             >
               {isSaving ? "Enviando..." : "Enviar Respostas"}
             </Button>
@@ -286,6 +313,18 @@ export default function TreinamentoExecucao() {
 
 function formTypeLabel(type: ApiFormType) {
   return type === "PRE_TEST" ? "Pre-teste" : "Pos-teste";
+}
+
+function getAvailabilityMessage(status: ReturnType<typeof getAvailabilityStatus>) {
+  if (status === "upcoming") {
+    return "Este formulario ainda nao esta disponivel.";
+  }
+
+  if (status === "expired") {
+    return "O prazo deste formulario ja foi encerrado.";
+  }
+
+  return "";
 }
 
 function FormExecutionSkeleton() {

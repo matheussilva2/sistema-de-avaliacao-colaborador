@@ -1,6 +1,7 @@
 package com.avaliacao.api.models;
 
 import com.avaliacao.api.enums.UserRole;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
@@ -28,7 +29,9 @@ public class UserModel {
     private String passWord;
     private String phone;
     private String cpf;
+    @JsonFormat(pattern = "dd/MM/yyyy")
     private LocalDate hireDate;
+    @JsonFormat(pattern = "dd/MM/yyyy")
     private LocalDate registrationDate;
 
     @Lob
