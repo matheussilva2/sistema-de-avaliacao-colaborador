@@ -1,14 +1,87 @@
-import { useMemo, useState } from "react";
-import { Button, Card, Input } from "@heroui/react";
+import { useEffect, useRef, useState } from "react";
+import { Button, Card, Input, Skeleton } from "@heroui/react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { trainingsMock } from "../../../mock";
-import { TestFormSection } from "../Novo-Treinamento/components/TestFormSection";
+import {
+  TestFormSection,
+  type QuestionFieldErrors,
+  type TestFormSectionErrors,
+} from "../Novo-Treinamento/components/TestFormSection";
 import type { Question, TestType } from "../Novo-Treinamento/types";
 import {
-  getFormsByTrainingId,
-  trainingFormTypeLabel,
-  type ManagedTrainingForm,
-} from "../mocks/trainingForms";
+  createFormQuestion,
+  createQuestionAlternative,
+  createTrainingForm,
+  deleteAlternative,
+  deleteQuestion,
+  getFormQuestions,
+  getQuestionAlternatives,
+  getTrainingResults,
+  getTrainingForms,
+  updateTrainingForm,
+  type ApiForm,
+  type ApiFormType,
+} from "../../../services/formService";
+import { ApiRequestError } from "../../../services/authService";
+import { getTrainingById, type ApiTraining } from "../../../services/trainingService";
+import {
+  moveFormToTrash,
+  restoreFormFromTrash,
+} from "../../../services/formTrashService";
+import { useUndoableDelete } from "../../../components/UndoDeleteProvider";
+import {
+  DATE_INPUT_PLACEHOLDER,
+  DEFAULT_END_TIME,
+  DEFAULT_START_TIME,
+  TIME_INPUT_PLACEHOLDER,
+  formatDateForDisplay,
+  formatTimeForDisplay,
+  formatDateInput,
+  isCompleteDateValue,
+  isCompleteTimeValue,
+  parseDateValue,
+  parseTimeValue,
+} from "../../../utils/dateUtils";
+
+type ManagedTrainingForm = {
+  id: string;
+  persistedId?: string;
+  trainingId: string;
+  title: string;
+  type: TestType;
+  startDeadline: string;
+  endDeadline: string;
+  startTime: string;
+  endTime: string;
+  minCorrect: string;
+  questions: Question[];
+};
+
+type ManagedFormField =
+  | "title"
+  | "type"
+  | "startDeadline"
+  | "endDeadline"
+  | "startTime"
+  | "endTime"
+  | "minCorrect";
+
+type ManagedFormFieldErrors = Partial<Record<ManagedFormField, string>>;
+type ManagedFormValidationErrors = ManagedFormFieldErrors & {
+  questions?: TestFormSectionErrors;
+};
+type FormFieldErrorsById = Record<string, ManagedFormValidationErrors>;
+
+const trainingFormTypeLabel: Record<TestType, string> = {
+  "pre-teste": "Pre-teste",
+  "pos-teste": "Pos-teste",
+};
+
+const TEMPORAL_FIELDS: ManagedFormField[] = [
+  "startDeadline",
+  "endDeadline",
+  "startTime",
+  "endTime",
+];
 
 const createEmptyQuestion = (): Question => ({
   id: crypto.randomUUID(),
@@ -17,7 +90,7 @@ const createEmptyQuestion = (): Question => ({
 });
 
 const createEmptyForm = (
-  trainingId: number,
+  trainingId: string,
   type: TestType = "pre-teste",
 ): ManagedTrainingForm => ({
   id: crypto.randomUUID(),
@@ -26,13 +99,15 @@ const createEmptyForm = (
   type,
   startDeadline: "",
   endDeadline: "",
+  startTime: DEFAULT_START_TIME,
+  endTime: DEFAULT_END_TIME,
   minCorrect: "70",
   questions: [],
 });
 
 type LocationState = {
   trainingDraft?: {
-    id: number;
+    id: string;
     title: string;
   };
 };
@@ -43,43 +118,158 @@ export default function FormulariosTreinamento() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const state = location.state as LocationState | null;
-  const trainingId = Number(id ?? state?.trainingDraft?.id ?? Date.now());
-  const training = trainingsMock.find((item) => item.id === trainingId);
+  const trainingId = id ?? state?.trainingDraft?.id ?? "";
   const defaultType = (searchParams.get("tipo") as TestType | null) ?? "pre-teste";
+  const selectedFormId = searchParams.get("formId");
 
-  const initialForms = useMemo(() => {
-    const existingForms = getFormsByTrainingId(trainingId);
-    if (existingForms.length > 0) return existingForms;
+  const [training, setTraining] = useState<ApiTraining | null>(null);
+  const [forms, setForms] = useState<ManagedTrainingForm[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLockedByAnswers, setIsLockedByAnswers] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FormFieldErrorsById>({});
+  const { scheduleUndoableDelete } = useUndoableDelete();
 
-    return [createEmptyForm(trainingId, defaultType)];
-  }, [defaultType, trainingId]);
+  useEffect(() => {
+    async function loadForms() {
+      if (!trainingId) {
+        setForms([createEmptyForm(crypto.randomUUID(), defaultType)]);
+        setIsLoading(false);
+        return;
+      }
 
-  const [forms, setForms] = useState<ManagedTrainingForm[]>(initialForms);
+      try {
+        const [trainingData, apiForms] = await Promise.all([
+          getTrainingById(trainingId),
+          getTrainingForms(trainingId),
+        ]);
+
+        setTraining(trainingData);
+
+        const hydratedForms = await Promise.all(
+          apiForms.map((form) => hydrateForm(trainingId, form)),
+        );
+
+        const selectedForm = selectedFormId
+          ? hydratedForms.find((form) => form.persistedId === selectedFormId)
+          : null;
+
+        setForms([selectedForm ?? createEmptyForm(trainingId, defaultType)]);
+
+        if (selectedForm?.persistedId) {
+          const trainingResults = await getTrainingResults(trainingId).catch(() => []);
+          setIsLockedByAnswers(
+            trainingResults.some((answer) => answer.form.idForm === selectedForm.persistedId),
+          );
+        } else {
+          setIsLockedByAnswers(false);
+        }
+      } catch {
+        setErrorMessage("Nao foi possivel carregar os formularios deste treinamento.");
+        setForms([createEmptyForm(trainingId || crypto.randomUUID(), defaultType)]);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadForms();
+  }, [defaultType, selectedFormId, trainingId]);
 
   const title = training?.title ?? state?.trainingDraft?.title ?? "Novo treinamento";
 
   const updateForm = (
     formId: string,
-    field: keyof Omit<ManagedTrainingForm, "id" | "trainingId" | "questions">,
+    field: ManagedFormField,
     value: string,
   ) => {
+    if (isLockedByAnswers) {
+      return;
+    }
+
+    const nextValue =
+      field === "startDeadline" || field === "endDeadline"
+        ? formatDateInput(value)
+        : value;
+
+    const currentForm = forms.find((form) => form.id === formId);
+
+    if (currentForm && TEMPORAL_FIELDS.includes(field)) {
+      const temporalErrors = validateTemporalFields({
+        ...currentForm,
+        [field]: nextValue,
+      });
+
+      setFieldErrors((current) =>
+        replaceTemporalFieldErrors(current, formId, temporalErrors),
+      );
+    } else {
+      setFieldErrors((prev) => clearFormFieldError(prev, formId, field));
+    }
+
     setForms((prev) =>
-      prev.map((form) => (form.id === formId ? { ...form, [field]: value } : form)),
+      prev.map((form) => (form.id === formId ? { ...form, [field]: nextValue } : form)),
     );
   };
 
-  const addForm = (type: TestType) => {
-    setForms((prev) => [...prev, createEmptyForm(trainingId, type)]);
-  };
+  const removeForm = async (formId: string) => {
+    const form = forms.find((item) => item.id === formId);
 
-  const removeForm = (formId: string) => {
-    setForms((prev) => prev.filter((form) => form.id !== formId));
+    if (!form?.persistedId || !trainingId) {
+      return;
+    }
+
+    try {
+      const trainingResults = await getTrainingResults(trainingId).catch(() => []);
+      const hasAnswers = trainingResults.some(
+        (answer) => answer.form.idForm === form.persistedId,
+      );
+
+      if (hasAnswers) {
+        setErrorMessage("Formulario ja tem respostas cadastradas.");
+        setSuccessMessage("");
+        return;
+      }
+    } catch {
+      setErrorMessage("Nao foi possivel verificar respostas cadastradas.");
+      setSuccessMessage("");
+      return;
+    }
+
+    const apiForm = mapManagedFormToApiForm(form);
+
+    scheduleUndoableDelete({
+      id: `form:${apiForm.idForm}`,
+      title: "Formulario movido para a lixeira",
+      description: "Voce pode desfazer esta movimentacao em ate 5 segundos.",
+      onStart: () => {
+        moveFormToTrash(trainingId, apiForm);
+        setForms((prev) => prev.filter((formItem) => formItem.id !== formId));
+        setSuccessMessage("");
+        setErrorMessage("");
+        navigate(`/painel/gerenciar-treinamentos/${trainingId}`);
+      },
+      onUndo: () => {
+        restoreFormFromTrash(trainingId, apiForm.idForm);
+        setForms((prev) =>
+          [...prev, form].sort((current, next) =>
+            current.title.localeCompare(next.title, "pt-BR"),
+          ),
+        );
+      },
+      onCommit: () => undefined,
+    });
   };
 
   const updateQuestions = (
     formId: string,
     updater: (questions: Question[]) => Question[],
   ) => {
+    if (isLockedByAnswers) {
+      return;
+    }
+
     setForms((prev) =>
       prev.map((form) =>
         form.id === formId ? { ...form, questions: updater(form.questions) } : form,
@@ -100,9 +290,62 @@ export default function FormulariosTreinamento() {
   };
 
   const handleRemoveQuestion = (formId: string, qId: string) => {
-    updateQuestions(formId, (questions) =>
-      questions.filter((question) => question.id !== qId),
-    );
+    const currentForm = forms.find((form) => form.id === formId);
+    const question = currentForm?.questions.find((item) => item.id === qId);
+
+    if (!question) {
+      return;
+    }
+
+    const questionIndex = currentForm?.questions.findIndex((item) => item.id === qId) ?? -1;
+    const removeQuestionFromState = () => {
+      updateQuestions(formId, (questions) =>
+        questions.filter((item) => item.id !== qId),
+      );
+    };
+    const restoreQuestionToState = () => {
+      updateQuestions(formId, (questions) => {
+        if (questions.some((item) => item.id === question.id)) {
+          return questions;
+        }
+
+        const nextQuestions = [...questions];
+        nextQuestions.splice(Math.max(questionIndex, 0), 0, question);
+        return nextQuestions;
+      });
+    };
+
+    if (!question.persistedId) {
+      scheduleUndoableDelete({
+        id: `draft-question:${question.id}`,
+        title: "Pergunta removida",
+        description: "A pergunta sera removida do formulario em 5 segundos.",
+        onStart: removeQuestionFromState,
+        onUndo: restoreQuestionToState,
+        onCommit: () => undefined,
+      });
+      return;
+    }
+
+    scheduleUndoableDelete({
+      id: `question:${question.persistedId}`,
+      title: "Pergunta removida",
+      description: `${question.title || "Pergunta"} sera excluida definitivamente em 5 segundos.`,
+      onStart: removeQuestionFromState,
+      onUndo: restoreQuestionToState,
+      onCommit: async () => {
+        await Promise.all(
+          question.options
+            .filter((option) => option.persistedId)
+            .map((option) => deleteAlternative(option.persistedId as string)),
+        );
+        await deleteQuestion(question.persistedId as string);
+      },
+      onCommitError: () => {
+        restoreQuestionToState();
+        setErrorMessage("Nao foi possivel excluir definitivamente a pergunta.");
+      },
+    });
   };
 
   const handleAddOption = (formId: string, qId: string) => {
@@ -148,9 +391,7 @@ export default function FormulariosTreinamento() {
           ? {
               ...question,
               options: question.options.map((option) =>
-                option.id === optId
-                  ? { ...option, isCorrect: !option.isCorrect }
-                  : option,
+                ({ ...option, isCorrect: option.id === optId }),
               ),
             }
           : question,
@@ -159,22 +400,146 @@ export default function FormulariosTreinamento() {
   };
 
   const handleRemoveOption = (formId: string, qId: string, optId: string) => {
-    updateQuestions(formId, (questions) =>
-      questions.map((question) =>
-        question.id === qId
-          ? {
-              ...question,
-              options: question.options.filter((option) => option.id !== optId),
-            }
-          : question,
-      ),
-    );
+    const currentForm = forms.find((form) => form.id === formId);
+    const question = currentForm?.questions.find((item) => item.id === qId);
+    const option = question?.options.find((item) => item.id === optId);
+
+    if (!question || !option) {
+      return;
+    }
+
+    const optionIndex = question.options.findIndex((item) => item.id === optId);
+    const removeOptionFromState = () => {
+      updateQuestions(formId, (questions) =>
+        questions.map((item) =>
+          item.id === qId
+            ? {
+                ...item,
+                options: item.options.filter((currentOption) => currentOption.id !== optId),
+              }
+            : item,
+        ),
+      );
+    };
+    const restoreOptionToState = () => {
+      updateQuestions(formId, (questions) =>
+        questions.map((item) => {
+          if (item.id !== qId || item.options.some((currentOption) => currentOption.id === option.id)) {
+            return item;
+          }
+
+          const nextOptions = [...item.options];
+          nextOptions.splice(Math.max(optionIndex, 0), 0, option);
+          return { ...item, options: nextOptions };
+        }),
+      );
+    };
+
+    scheduleUndoableDelete({
+      id: option.persistedId
+        ? `alternative:${option.persistedId}`
+        : `draft-alternative:${option.id}`,
+      title: "Alternativa removida",
+      description: `${option.text || "Alternativa"} sera excluida definitivamente em 5 segundos.`,
+      onStart: removeOptionFromState,
+      onUndo: restoreOptionToState,
+      onCommit: async () => {
+        if (option.persistedId) {
+          await deleteAlternative(option.persistedId);
+        }
+      },
+      onCommitError: () => {
+        restoreOptionToState();
+        setErrorMessage("Nao foi possivel excluir definitivamente a alternativa.");
+      },
+    });
   };
 
-  const handleSave = () => {
-    console.log("FORMULARIOS DO TREINAMENTO:", forms);
-    navigate(id ? `/painel/gerenciar-treinamentos/${trainingId}` : "/painel/gerenciar-treinamentos");
+  const handleSave = async () => {
+    if (isLockedByAnswers) {
+      setErrorMessage("Formulario ja tem respostas cadastradas e nao pode ser editado.");
+      setSuccessMessage("");
+      return;
+    }
+
+    if (!trainingId) {
+      setErrorMessage("Salve o treinamento antes de criar formularios.");
+      return;
+    }
+
+    setIsSaving(true);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    const validationErrors = validateManagedForms(forms);
+
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors);
+      setErrorMessage("Corrija os campos destacados antes de salvar.");
+      setIsSaving(false);
+      return;
+    }
+
+    setFieldErrors({});
+
+    let currentForm: ManagedTrainingForm | null = null;
+
+    try {
+      for (const form of forms) {
+        currentForm = form;
+        const savedForm = form.persistedId
+          ? await updateTrainingForm(form.persistedId, buildFormPayload(form))
+          : await createTrainingForm(trainingId, buildFormPayload(form));
+
+        if (!form.persistedId) {
+          for (const question of form.questions) {
+            if (!question.title) continue;
+
+            const savedQuestion = await createFormQuestion(savedForm.idForm, question.title);
+
+            for (const option of question.options) {
+              if (!option.text) continue;
+
+              await createQuestionAlternative(
+                savedQuestion.idQuestion,
+                option.text,
+                option.isCorrect,
+              );
+            }
+          }
+        }
+      }
+
+      setSuccessMessage("Formularios salvos com sucesso.");
+      navigate(`/painel/gerenciar-treinamentos/${trainingId}`);
+    } catch (error) {
+      if (error instanceof ApiRequestError && currentForm) {
+        const apiFieldErrors = mapApiErrorsToManagedForm(error.fieldErrors);
+
+        if (Object.keys(apiFieldErrors).length > 0) {
+          const currentFormId = currentForm.id;
+
+          setFieldErrors((prev) => ({
+            ...prev,
+            [currentFormId]: {
+              ...prev[currentFormId],
+              ...apiFieldErrors,
+            },
+          }));
+          setErrorMessage("Corrija os campos destacados antes de salvar.");
+          return;
+        }
+      }
+
+      setErrorMessage("Nao foi possivel salvar os formularios. Confira os campos.");
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  if (isLoading) {
+    return <TrainingFormsSkeleton />;
+  }
 
   return (
     <div className="min-h-screen bg-neutral-50 p-8">
@@ -183,45 +548,43 @@ export default function FormulariosTreinamento() {
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <h1 className="text-2xl font-bold text-primary">
-                Formularios do treinamento
+                {selectedFormId ? "Editar formulario" : "Adicionar formulario"}
               </h1>
               <p className="mt-1 text-neutral-600">{title}</p>
             </div>
 
             <div className="flex flex-wrap gap-3">
               <Button
-                className="bg-blue-50 text-blue-700"
-                onPress={() => addForm("pre-teste")}
+                className="bg-white text-primary border border-primary"
+                onPress={() => navigate(`/painel/gerenciar-treinamentos/${trainingId}`)}
               >
-                + Pre-teste
-              </Button>
-              <Button
-                className="bg-green-50 text-green-700"
-                onPress={() => addForm("pos-teste")}
-              >
-                + Pos-teste
+                Voltar ao treinamento
               </Button>
             </div>
           </div>
         </Card>
 
-        {forms.map((form, index) => (
+        {forms.map((form) => {
+          const currentFieldErrors = fieldErrors[form.id] ?? {};
+
+          return (
           <Card key={form.id} className="p-6">
             <div className="mb-5 flex flex-col gap-4">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-neutral-500">
-                    Formulario {index + 1}
+                    Formulario do treinamento
                   </p>
                   <h2 className="text-xl font-semibold text-primary">
                     {trainingFormTypeLabel[form.type]}
                   </h2>
                 </div>
 
-                {forms.length > 1 && (
+                {form.persistedId && (
                   <Button
                     className="bg-red-50 text-red-700"
                     onPress={() => removeForm(form.id)}
+                    isDisabled={isSaving || isLockedByAnswers}
                   >
                     Remover formulario
                   </Button>
@@ -236,7 +599,10 @@ export default function FormulariosTreinamento() {
                   <Input
                     value={form.title}
                     onChange={(event) => updateForm(form.id, "title", event.target.value)}
+                    readOnly={isLockedByAnswers}
+                    className={getInputClassName(Boolean(currentFieldErrors.title))}
                   />
+                  <FieldError message={currentFieldErrors.title} />
                 </div>
 
                 <div className="flex flex-col gap-2">
@@ -248,38 +614,76 @@ export default function FormulariosTreinamento() {
                     onChange={(event) =>
                       updateForm(form.id, "type", event.target.value as TestType)
                     }
-                    className="rounded-md border-2 border-neutral-300 bg-white p-3 text-sm outline-none focus:border-primary"
+                    disabled={isLockedByAnswers}
+                    className={getSelectClassName(Boolean(currentFieldErrors.type))}
                   >
                     <option value="pre-teste">Pre-teste</option>
                     <option value="pos-teste">Pos-teste</option>
                   </select>
+                  <FieldError message={currentFieldErrors.type} />
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium text-neutral-700">
-                    Prazo de inicio
+                    Data de inicio
                   </label>
-                  <Input
-                    type="date"
+                  <DateField
                     value={form.startDeadline}
-                    onChange={(event) =>
-                      updateForm(form.id, "startDeadline", event.target.value)
-                    }
+                    onChange={(value) => updateForm(form.id, "startDeadline", value)}
+                    min={getTodayNativeDate()}
+                    readOnly={isLockedByAnswers}
+                    hasError={Boolean(currentFieldErrors.startDeadline)}
+                    label="Selecionar data de inicio"
                   />
+                  <FieldError message={currentFieldErrors.startDeadline} />
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium text-neutral-700">
-                    Prazo final
+                    Horario de inicio
                   </label>
                   <Input
-                    type="date"
-                    value={form.endDeadline}
+                    type="time"
+                    value={form.startTime}
                     onChange={(event) =>
-                      updateForm(form.id, "endDeadline", event.target.value)
+                      updateForm(form.id, "startTime", event.target.value)
                     }
+                    placeholder={TIME_INPUT_PLACEHOLDER}
+                    readOnly={isLockedByAnswers}
+                    className={getInputClassName(Boolean(currentFieldErrors.startTime))}
                   />
+                  <FieldError message={currentFieldErrors.startTime} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-neutral-700">
+                    Data final
+                  </label>
+                  <DateField
+                    value={form.endDeadline}
+                    onChange={(value) => updateForm(form.id, "endDeadline", value)}
+                    min={toNativeDateValue(form.startDeadline) || getTodayNativeDate()}
+                    readOnly={isLockedByAnswers}
+                    hasError={Boolean(currentFieldErrors.endDeadline)}
+                    label="Selecionar data final"
+                  />
+                  <FieldError message={currentFieldErrors.endDeadline} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-neutral-700">
+                    Horario final
+                  </label>
+                  <Input
+                    type="time"
+                    value={form.endTime}
+                    onChange={(event) =>
+                      updateForm(form.id, "endTime", event.target.value)
+                    }
+                    placeholder={TIME_INPUT_PLACEHOLDER}
+                    readOnly={isLockedByAnswers}
+                    className={getInputClassName(Boolean(currentFieldErrors.endTime))}
+                  />
+                  <FieldError message={currentFieldErrors.endTime} />
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium text-neutral-700">
@@ -290,7 +694,8 @@ export default function FormulariosTreinamento() {
                     onChange={(event) =>
                       updateForm(form.id, "minCorrect", event.target.value)
                     }
-                    className="rounded-md border-2 border-neutral-300 bg-white p-3 text-sm outline-none focus:border-primary"
+                    disabled={isLockedByAnswers}
+                    className={getSelectClassName(Boolean(currentFieldErrors.minCorrect))}
                   >
                     <option value="50">50% de acertos</option>
                     <option value="60">60% de acertos</option>
@@ -298,6 +703,7 @@ export default function FormulariosTreinamento() {
                     <option value="80">80% de acertos</option>
                     <option value="90">90% de acertos</option>
                   </select>
+                  <FieldError message={currentFieldErrors.minCorrect} />
                 </div>
               </div>
             </div>
@@ -320,19 +726,608 @@ export default function FormulariosTreinamento() {
               onRemoveOption={(qId, optId) =>
                 handleRemoveOption(form.id, qId, optId)
               }
+              isReadOnly={isLockedByAnswers}
+              errors={currentFieldErrors.questions}
             />
+
+            {isLockedByAnswers && (
+              <p className="mt-4 rounded-md bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
+                Formulario ja tem respostas cadastradas e nao pode ser editado.
+              </p>
+            )}
           </Card>
-        ))}
+          );
+        })}
+
+        {errorMessage && (
+          <p className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
+            {errorMessage}
+          </p>
+        )}
+
+        {successMessage && (
+          <p className="rounded-md bg-green-50 px-4 py-3 text-sm text-green-700">
+            {successMessage}
+          </p>
+        )}
 
         <div className="flex justify-end gap-3">
-          <Button className="bg-neutral-300 text-neutral-800" onPress={() => navigate(-1)}>
+          <Button
+            className="bg-neutral-300 text-neutral-800"
+            onPress={() =>
+              navigate(
+                trainingId
+                  ? `/painel/gerenciar-treinamentos/${trainingId}`
+                  : "/painel/gerenciar-treinamentos",
+              )
+            }
+          >
             Cancelar
           </Button>
-          <Button className="bg-primary text-white px-8" onPress={handleSave}>
-            Salvar formularios
+          <Button
+            className="bg-primary text-white px-8"
+            onPress={handleSave}
+            isDisabled={isSaving || isLockedByAnswers}
+          >
+            {isSaving ? "Salvando..." : "Salvar formularios"}
           </Button>
         </div>
       </div>
     </div>
   );
+}
+
+function TrainingFormsSkeleton() {
+  return (
+    <div className="min-h-screen bg-neutral-50 p-8">
+      <div className="mx-auto flex max-w-5xl flex-col gap-6">
+        <Card className="p-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <Skeleton className="h-8 w-56 rounded-md" />
+              <Skeleton className="mt-2 h-5 w-72 rounded-md" />
+            </div>
+            <Skeleton className="h-10 w-40 rounded-md" />
+          </div>
+        </Card>
+
+        <Card className="p-6">
+          <div className="mb-5 flex flex-col gap-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <Skeleton className="h-4 w-40 rounded-md" />
+                <Skeleton className="mt-2 h-7 w-32 rounded-md" />
+              </div>
+              <Skeleton className="h-10 w-40 rounded-md" />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <Skeleton className="h-20 w-full rounded-md" />
+              <Skeleton className="h-20 w-full rounded-md" />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <Skeleton className="h-20 w-full rounded-md" />
+              <Skeleton className="h-20 w-full rounded-md" />
+              <Skeleton className="h-20 w-full rounded-md" />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            {[1, 2].map((question) => (
+              <div key={question} className="rounded-md border border-gray-200 p-4">
+                <Skeleton className="h-6 w-56 rounded-md" />
+                <div className="mt-4 grid gap-3">
+                  {[1, 2, 3].map((option) => (
+                    <Skeleton key={option} className="h-12 w-full rounded-md" />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <div className="flex justify-end gap-3">
+          <Skeleton className="h-10 w-24 rounded-md" />
+          <Skeleton className="h-10 w-40 rounded-md" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) {
+    return null;
+  }
+
+  return <p className="text-xs font-semibold text-red-600">{message}</p>;
+}
+
+function DateField({
+  value,
+  onChange,
+  min,
+  readOnly,
+  hasError,
+  label,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  min: string;
+  readOnly: boolean;
+  hasError: boolean;
+  label: string;
+}) {
+  const calendarInputRef = useRef<HTMLInputElement>(null);
+
+  const openCalendar = () => {
+    const calendarInput = calendarInputRef.current;
+
+    if (!calendarInput || readOnly) {
+      return;
+    }
+
+    try {
+      calendarInput.showPicker?.();
+    } catch {
+      calendarInput.focus();
+    }
+  };
+
+  return (
+    <div>
+      <Input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        onFocus={openCalendar}
+        onClick={openCalendar}
+        inputMode="numeric"
+        maxLength={10}
+        placeholder={DATE_INPUT_PLACEHOLDER}
+        readOnly={readOnly}
+        className={getInputClassName(hasError)}
+      />
+      <input
+        ref={calendarInputRef}
+        type="date"
+        value={toNativeDateValue(value)}
+        min={min}
+        disabled={readOnly}
+        onChange={(event) => onChange(event.target.value)}
+        aria-label={label}
+        className="sr-only"
+      />
+    </div>
+  );
+}
+
+function getInputClassName(hasError: boolean) {
+  return hasError ? "rounded-md border-2 border-red-500" : "";
+}
+
+function getSelectClassName(hasError: boolean) {
+  const borderClass = hasError
+    ? "border-red-500 focus:border-red-500"
+    : "border-neutral-300 focus:border-primary";
+
+  return `rounded-md border-2 ${borderClass} bg-white p-3 text-sm outline-none`;
+}
+
+function mapTestTypeToApi(type: TestType): ApiFormType {
+  return type === "pre-teste" ? "PRE_TEST" : "POST_TEST";
+}
+
+function mapApiFormType(type: ApiFormType): TestType {
+  return type === "PRE_TEST" ? "pre-teste" : "pos-teste";
+}
+
+async function hydrateForm(trainingId: string, form: ApiForm): Promise<ManagedTrainingForm> {
+  const questions = await getFormQuestions(form.idForm);
+  const hydratedQuestions = await Promise.all(
+    questions.map(async (question) => {
+      const alternatives = await getQuestionAlternatives(question.idQuestion);
+
+      return {
+        id: question.idQuestion,
+        persistedId: question.idQuestion,
+        title: question.title,
+        options: alternatives.map((alternative) => ({
+          id: alternative.idAlternative,
+          persistedId: alternative.idAlternative,
+          text: alternative.text,
+          isCorrect: alternative.correct,
+        })),
+      };
+    }),
+  );
+
+  return {
+    id: form.idForm,
+    persistedId: form.idForm,
+    trainingId,
+    title: form.title,
+    type: mapApiFormType(form.formType),
+    startDeadline: formatDateForDisplay(form.initDate),
+    endDeadline: formatDateForDisplay(form.endDate),
+    startTime: formatTimeForDisplay(form.initTime) || DEFAULT_START_TIME,
+    endTime: formatTimeForDisplay(form.endTime) || DEFAULT_END_TIME,
+    minCorrect: String(form.minCorrectPercentage),
+    questions: hydratedQuestions,
+  };
+}
+
+function mapManagedFormToApiForm(form: ManagedTrainingForm): ApiForm {
+  return {
+    idForm: form.persistedId ?? form.id,
+    title: form.title,
+    formType: mapTestTypeToApi(form.type),
+    initDate: formatDateForDisplay(form.startDeadline),
+    endDate: formatDateForDisplay(form.endDeadline),
+    initTime: formatTimeForDisplay(form.startTime) || DEFAULT_START_TIME,
+    endTime: formatTimeForDisplay(form.endTime) || DEFAULT_END_TIME,
+    minCorrectPercentage: Number(form.minCorrect),
+  };
+}
+
+function buildFormPayload(form: ManagedTrainingForm) {
+  return {
+    title: form.title.trim(),
+    formType: mapTestTypeToApi(form.type),
+    initDate: formatDateForDisplay(form.startDeadline),
+    endDate: formatDateForDisplay(form.endDeadline),
+    initTime: formatTimeForDisplay(form.startTime),
+    endTime: formatTimeForDisplay(form.endTime),
+    minCorrectPercentage: Number(form.minCorrect),
+  };
+}
+
+function validateManagedForms(forms: ManagedTrainingForm[]) {
+  return forms.reduce<FormFieldErrorsById>((errorsByForm, form) => {
+    const formErrors = validateManagedForm(form);
+
+    if (Object.keys(formErrors).length > 0) {
+      errorsByForm[form.id] = formErrors;
+    }
+
+    return errorsByForm;
+  }, {});
+}
+
+function validateManagedForm(form: ManagedTrainingForm) {
+  const errors: ManagedFormValidationErrors = {};
+  const startDate = parseDateValue(form.startDeadline);
+  const endDate = parseDateValue(form.endDeadline);
+  const startTime = parseTimeValue(form.startTime);
+  const endTime = parseTimeValue(form.endTime);
+  const minCorrect = Number(form.minCorrect);
+
+  if (!form.title.trim()) {
+    errors.title = "Informe o titulo do formulario.";
+  }
+
+  if (!form.type) {
+    errors.type = "Informe o tipo de formulario.";
+  }
+
+  if (!form.startDeadline.trim()) {
+    errors.startDeadline = "Informe a data de inicio.";
+  } else if (!isCompleteDateValue(form.startDeadline) || !startDate) {
+    errors.startDeadline = "Informe uma data de inicio valida.";
+  } else if (startDate < getTodayAtMidnight()) {
+    errors.startDeadline = "A data de inicio nao pode ser anterior a hoje.";
+  }
+
+  if (!form.endDeadline.trim()) {
+    errors.endDeadline = "Informe a data final.";
+  } else if (!isCompleteDateValue(form.endDeadline) || !endDate) {
+    errors.endDeadline = "Informe uma data final valida.";
+  }
+
+  if (!form.startTime.trim()) {
+    errors.startTime = "Informe o horario de inicio.";
+  } else if (!isCompleteTimeValue(form.startTime) || !startTime) {
+    errors.startTime = "Informe um horario de inicio valido.";
+  }
+
+  if (!form.endTime.trim()) {
+    errors.endTime = "Informe o horario final.";
+  } else if (!isCompleteTimeValue(form.endTime) || !endTime) {
+    errors.endTime = "Informe um horario final valido.";
+  }
+
+  if (!form.minCorrect.trim()) {
+    errors.minCorrect = "Informe o minimo de acertos.";
+  } else if (!Number.isFinite(minCorrect) || minCorrect < 0 || minCorrect > 100) {
+    errors.minCorrect = "Informe um minimo de acertos entre 0 e 100.";
+  }
+
+  if (startDate && endDate && endDate < startDate) {
+    errors.endDeadline = "A data final nao pode ser anterior a data de inicio.";
+  }
+
+  if (startDate && endDate && startTime && endTime) {
+    const start = buildDateTime(startDate, startTime);
+    const end = buildDateTime(endDate, endTime);
+
+    if (end < start) {
+      errors.endTime =
+        "O horario final deve ser posterior ou igual ao inicio da disponibilidade.";
+    }
+  }
+
+  const questionErrors: Record<string, QuestionFieldErrors> = {};
+
+  if (form.questions.length === 0) {
+    errors.questions = {
+      questions: "Adicione pelo menos uma questao ao formulario.",
+    };
+  } else {
+    form.questions.forEach((question) => {
+      const currentQuestionErrors: QuestionFieldErrors = {};
+      const optionErrors: Record<string, string> = {};
+      const correctOptions = question.options.filter((option) => option.isCorrect);
+
+      if (!question.title.trim()) {
+        currentQuestionErrors.title = "Informe o enunciado da questao.";
+      }
+
+      if (question.options.length < 2) {
+        currentQuestionErrors.alternatives =
+          "Adicione pelo menos duas alternativas a esta questao.";
+      }
+
+      question.options.forEach((option) => {
+        if (!option.text.trim()) {
+          optionErrors[option.id] = "Informe o texto da alternativa.";
+        }
+      });
+
+      if (Object.keys(optionErrors).length > 0) {
+        currentQuestionErrors.optionsById = optionErrors;
+      }
+
+      if (correctOptions.length === 0) {
+        currentQuestionErrors.correctOption =
+          "Selecione uma alternativa correta para esta questao.";
+      } else if (correctOptions.length > 1) {
+        currentQuestionErrors.correctOption =
+          "Selecione apenas uma alternativa correta para esta questao.";
+      }
+
+      if (Object.keys(currentQuestionErrors).length > 0) {
+        questionErrors[question.id] = currentQuestionErrors;
+      }
+    });
+
+    if (Object.keys(questionErrors).length > 0) {
+      errors.questions = { byQuestion: questionErrors };
+    }
+  }
+
+  if (startDate && isToday(startDate) && startTime && isStartTimeTooEarly(startTime)) {
+    errors.startTime = "O horario de inicio pode ser no maximo 5 minutos anterior ao atual.";
+  }
+
+  return errors;
+}
+
+function validateTemporalFields(form: ManagedTrainingForm): ManagedFormFieldErrors {
+  const errors: ManagedFormFieldErrors = {};
+  const startDate = parseDateValue(form.startDeadline);
+  const endDate = parseDateValue(form.endDeadline);
+  const startTime = parseTimeValue(form.startTime);
+  const endTime = parseTimeValue(form.endTime);
+
+  if (isCompleteDateValue(form.startDeadline)) {
+    if (!startDate) {
+      errors.startDeadline = "Informe uma data de inicio valida.";
+    } else if (startDate < getTodayAtMidnight()) {
+      errors.startDeadline = "A data de inicio nao pode ser anterior a hoje.";
+    }
+  }
+
+  if (isCompleteDateValue(form.endDeadline)) {
+    if (!endDate) {
+      errors.endDeadline = "Informe uma data final valida.";
+    } else if (startDate && endDate < startDate) {
+      errors.endDeadline = "A data final nao pode ser anterior a data de inicio.";
+    }
+  }
+
+  if (form.startTime && !startTime) {
+    errors.startTime = "Informe um horario de inicio valido.";
+  } else if (startDate && isToday(startDate) && startTime && isStartTimeTooEarly(startTime)) {
+    errors.startTime = "O horario de inicio pode ser no maximo 5 minutos anterior ao atual.";
+  }
+
+  if (form.endTime && !endTime) {
+    errors.endTime = "Informe um horario final valido.";
+  }
+
+  if (startDate && endDate && startTime && endTime) {
+    const start = buildDateTime(startDate, startTime);
+    const end = buildDateTime(endDate, endTime);
+
+    if (end < start) {
+      errors.endTime =
+        "O horario final deve ser posterior ou igual ao inicio da disponibilidade.";
+    }
+  }
+
+  return errors;
+}
+
+function getTodayAtMidnight() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today;
+}
+
+function isToday(date: Date) {
+  return date.getTime() === getTodayAtMidnight().getTime();
+}
+
+function isStartTimeTooEarly(time: NonNullable<ReturnType<typeof parseTimeValue>>) {
+  const earliestTime = new Date();
+  earliestTime.setMinutes(earliestTime.getMinutes() - 5);
+  earliestTime.setSeconds(0, 0);
+
+  const selectedTime = new Date();
+  selectedTime.setHours(time.hours, time.minutes, 0, 0);
+
+  return selectedTime < earliestTime;
+}
+
+function getTodayNativeDate() {
+  const today = getTodayAtMidnight();
+
+  return [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, "0"),
+    String(today.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function toNativeDateValue(value: string) {
+  const date = parseDateValue(value);
+
+  if (!date) {
+    return "";
+  }
+
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function buildDateTime(
+  date: Date,
+  time: NonNullable<ReturnType<typeof parseTimeValue>>,
+) {
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    time.hours,
+    time.minutes,
+  );
+}
+
+function replaceTemporalFieldErrors(
+  fieldErrors: FormFieldErrorsById,
+  formId: string,
+  temporalErrors: ManagedFormFieldErrors,
+) {
+  const nextFormErrors: ManagedFormValidationErrors = {
+    ...fieldErrors[formId],
+  };
+
+  TEMPORAL_FIELDS.forEach((field) => {
+    delete nextFormErrors[field];
+  });
+
+  Object.assign(nextFormErrors, temporalErrors);
+
+  const nextErrors = { ...fieldErrors };
+
+  if (Object.keys(nextFormErrors).length === 0) {
+    delete nextErrors[formId];
+  } else {
+    nextErrors[formId] = nextFormErrors;
+  }
+
+  return nextErrors;
+}
+
+function clearFormFieldError(
+  fieldErrors: FormFieldErrorsById,
+  formId: string,
+  field: ManagedFormField,
+) {
+  if (!fieldErrors[formId]?.[field]) {
+    return fieldErrors;
+  }
+
+  const nextFormErrors = { ...fieldErrors[formId], [field]: "" };
+  const nextErrors = { ...fieldErrors, [formId]: nextFormErrors };
+
+  if (Object.values(nextFormErrors).every((message) => !message)) {
+    delete nextErrors[formId];
+  }
+
+  return nextErrors;
+}
+
+function mapApiErrorsToManagedForm(apiErrors: Record<string, string>) {
+  const fieldMap: Record<string, ManagedFormField> = {
+    title: "title",
+    formType: "type",
+    initDate: "startDeadline",
+    endDate: "endDeadline",
+    initTime: "startTime",
+    endTime: "endTime",
+    minCorrectPercentage: "minCorrect",
+  };
+
+  return Object.entries(apiErrors).reduce<ManagedFormFieldErrors>(
+    (formErrors, [apiField, message]) => {
+      const formField = fieldMap[apiField];
+
+      if (formField) {
+        formErrors[formField] = normalizeApiFormErrorMessage(message);
+      }
+
+      return formErrors;
+    },
+    {},
+  );
+}
+
+function normalizeApiFormErrorMessage(message: string) {
+  if (message.includes("Data de inicio")) {
+    return message.includes("obrigatoria")
+      ? "Informe a data de inicio."
+      : "Informe uma data de inicio valida.";
+  }
+
+  if (message.includes("Data de termino")) {
+    return message.includes("posterior") || message.includes("igual")
+      ? "A data final nao pode ser anterior a data de inicio."
+      : message.includes("obrigatoria")
+        ? "Informe a data final."
+        : "Informe uma data final valida.";
+  }
+
+  if (message.includes("Horario de inicio")) {
+    return message.includes("obrigatorio")
+      ? "Informe o horario de inicio."
+      : "Informe um horario de inicio valido.";
+  }
+
+  if (message.includes("Horario de termino")) {
+    return message.includes("posterior") || message.includes("igual")
+      ? "O horario final deve ser posterior ou igual ao inicio da disponibilidade."
+      : message.includes("obrigatorio")
+        ? "Informe o horario final."
+        : "Informe um horario final valido.";
+  }
+
+  if (message.includes("Titulo")) {
+    return "Informe o titulo do formulario.";
+  }
+
+  if (message.includes("Tipo de formulario")) {
+    return "Informe o tipo de formulario.";
+  }
+
+  if (message.includes("Percentual minimo")) {
+    return message.includes("obrigatorio")
+      ? "Informe o minimo de acertos."
+      : "Informe um minimo de acertos entre 0 e 100.";
+  }
+
+  return message;
 }

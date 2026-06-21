@@ -86,7 +86,7 @@ export default function TreinamentoResultados() {
       </div>
 
       <div className="flex justify-between mt-6">
-        <Button className="bg-neutral-200 text-neutral-900 px-5 py-2 rounded-lg" onClick={() => navigate(-1)}>
+        <Button className="bg-neutral-200 text-neutral-900 px-5 py-2 rounded-lg" onClick={() => navigate(`/painel/treinamentos/${trainingId}`)}>
           Voltar
         </Button>
         <Button className="bg-primary text-white px-5 py-2 rounded-lg" onClick={() => navigate(`/painel/treinamentos/${trainingId}`)}>

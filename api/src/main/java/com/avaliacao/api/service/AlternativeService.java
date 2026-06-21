@@ -31,6 +31,8 @@ public class AlternativeService {
 
         var alternative = new AlternativeModel();
         BeanUtils.copyProperties(alternativeRecordDTO,alternative);
+        alternative.setText(alternativeRecordDTO.text().trim());
+        alternative.setCorrect(alternativeRecordDTO.correct());
         alternative.setQuestion(questionO.get());
 
         return Optional.of(alternativeRepository.save(alternative));
@@ -63,6 +65,8 @@ public class AlternativeService {
 
         var alternative = alternativeO.get();
         BeanUtils.copyProperties(alternativeRecordDTO,alternative);
+        alternative.setText(alternativeRecordDTO.text().trim());
+        alternative.setCorrect(alternativeRecordDTO.correct());
 
         return Optional.of(alternativeRepository.save(alternative));
     }

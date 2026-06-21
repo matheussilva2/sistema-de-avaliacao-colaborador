@@ -1,49 +1,120 @@
-import { type ChangeEvent, useState } from "react";
+import { type ChangeEvent, type FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, Input, Label, Button } from "@heroui/react";
 import { UserCircle2 } from "lucide-react";
+import { ApiRequestError, getAuthenticatedUser } from "../../../services/authService";
+import { createEmployeeForManager } from "../../../services/userService";
+import {
+  DATE_INPUT_PLACEHOLDER,
+  formatDateInput,
+  isCompleteDateValue,
+  parseDateValue,
+} from "../../../utils/dateUtils";
 
 export default function AdicionarColaborador() {
   const navigate = useNavigate();
   const [previewUrl, setPreviewUrl] = useState("");
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [form, setForm] = useState({
     nome: "",
     sobrenome: "",
     cpf: "",
     email: "",
     telefone: "",
-    cargo: "colaborador",
+    senha: "",
+    confirmarSenha: "",
     situacao: "Ativo",
     dataContratacao: "",
     dataRegistro: "",
   });
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
   const handleFieldChange = (field: keyof typeof form, value: string) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    const nextValue =
+      field === "cpf"
+        ? formatCpf(value)
+        : field === "dataContratacao" || field === "dataRegistro"
+          ? formatDateInput(value)
+          : value;
+
+    setForm((prev) => ({ ...prev, [field]: nextValue }));
+    setFieldErrors((prev) => ({ ...prev, [field]: "" }));
   };
 
   const handlePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
     if (!file) {
-      setPhotoFile(null);
       setPreviewUrl("");
       return;
     }
 
-    setPhotoFile(file);
     setPreviewUrl(URL.createObjectURL(file));
   };
 
-  const handleSave = () => {
-    const payload = {
-      ...form,
-      situacao: form.situacao,
-      foto: photoFile,
-      dataRegistro: form.dataRegistro || new Date().toLocaleDateString("pt-BR"),
-    };
+  const handleSave = async (event: FormEvent) => {
+    event.preventDefault();
+    setErrorMessage("");
+    const validationErrors = validateCollaboratorForm(form, true);
 
-    console.log("Salvar novo colaborador:", payload);
-    navigate("/painel/colaboradores");
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors);
+      setErrorMessage("Corrija os campos destacados antes de salvar.");
+      return;
+    }
+
+    setFieldErrors({});
+    setIsLoading(true);
+
+    const manager = getAuthenticatedUser();
+
+    if (!manager || manager.userRole !== "MANAGER") {
+      setErrorMessage("Faca login como gestor para cadastrar colaboradores.");
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      await createEmployeeForManager(manager.id, {
+        name: form.nome,
+        lastName: form.sobrenome,
+        cpf: form.cpf,
+        email: form.email,
+        phone: form.telefone,
+        passWord: form.senha,
+        hireDate: form.dataContratacao,
+        registrationDate: form.dataRegistro,
+        userRole: "EMPLOYEE",
+        active: form.situacao === "Ativo",
+      });
+
+      navigate("/painel/colaboradores");
+    } catch (error) {
+      if (error instanceof ApiRequestError) {
+        const apiFieldErrors = mapApiErrorsToCollaboratorForm(error.fieldErrors);
+
+        if (Object.keys(apiFieldErrors).length > 0) {
+          setFieldErrors((prev) => ({ ...prev, ...apiFieldErrors }));
+          setErrorMessage("Corrija os campos destacados antes de salvar.");
+          return;
+        }
+
+        if (error.status === 409) {
+          setErrorMessage("Ja existe uma conta cadastrada com esse e-mail.");
+          setFieldErrors((prev) => ({
+            ...prev,
+            email: "Ja existe uma conta cadastrada com esse e-mail.",
+          }));
+          return;
+        }
+
+        setErrorMessage(getCreateCollaboratorErrorMessage(error.message));
+      } else {
+        setErrorMessage("Nao foi possivel cadastrar o usuario. Confira os dados.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -96,7 +167,7 @@ export default function AdicionarColaborador() {
           </Card>
         </div>
 
-        <div className="col-span-12 xl:col-span-8 space-y-6">
+        <form onSubmit={handleSave} noValidate className="col-span-12 xl:col-span-8 space-y-6">
           <Card className="rounded-3xl bg-white shadow-sm overflow-hidden">
             <div className="bg-primary text-white px-6 py-4">
               <h2 className="font-semibold">Dados pessoais</h2>
@@ -113,7 +184,9 @@ export default function AdicionarColaborador() {
                   onChange={(e) => handleFieldChange("nome", e.target.value)}
                   placeholder="Digite o nome"
                   className="bg-white"
+                  required
                 />
+                <FieldError message={fieldErrors.nome} />
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="sobrenome" className="text-primary-700 font-semibold text-sm">
@@ -126,7 +199,9 @@ export default function AdicionarColaborador() {
                   onChange={(e) => handleFieldChange("sobrenome", e.target.value)}
                   placeholder="Digite o sobrenome"
                   className="bg-white"
+                  required
                 />
+                <FieldError message={fieldErrors.sobrenome} />
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="cpf" className="text-primary-700 font-semibold text-sm">
@@ -139,7 +214,9 @@ export default function AdicionarColaborador() {
                   onChange={(e) => handleFieldChange("cpf", e.target.value)}
                   placeholder="000.000.000-00"
                   className="bg-white"
+                  required
                 />
+                <FieldError message={fieldErrors.cpf} />
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="email" className="text-primary-700 font-semibold text-sm">
@@ -152,7 +229,9 @@ export default function AdicionarColaborador() {
                   onChange={(e) => handleFieldChange("email", e.target.value)}
                   placeholder="email@empresa.com"
                   className="bg-white"
+                  required
                 />
+                <FieldError message={fieldErrors.email} />
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="telefone" className="text-primary-700 font-semibold text-sm">
@@ -165,24 +244,54 @@ export default function AdicionarColaborador() {
                   onChange={(e) => handleFieldChange("telefone", e.target.value)}
                   placeholder="(XX) XXXXX-XXXX"
                   className="bg-white"
+                  required
                 />
+                <FieldError message={fieldErrors.telefone} />
               </div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="cargo" className="text-primary-700 font-semibold text-sm">
-                  Cargo
+                <Label htmlFor="senha" className="text-primary-700 font-semibold text-sm">
+                  Senha inicial
                 </Label>
                 <Input
-                  id="cargo"
-                  type="text"
-                  value={form.cargo}
-                  onChange={(e) => handleFieldChange("cargo", e.target.value)}
-                  placeholder="Ex: colaborador"
+                  id="senha"
+                  type="password"
+                  value={form.senha}
+                  onChange={(e) => handleFieldChange("senha", e.target.value)}
+                  placeholder="Senha para primeiro acesso"
                   className="bg-white"
+                  required
+                />
+                <PasswordRequirements password={form.senha} />
+                <FieldError message={fieldErrors.senha} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="confirmarSenha" className="text-primary-700 font-semibold text-sm">
+                  Confirmar senha
+                </Label>
+                <Input
+                  id="confirmarSenha"
+                  type="password"
+                  value={form.confirmarSenha}
+                  onChange={(e) => handleFieldChange("confirmarSenha", e.target.value)}
+                  placeholder="Digite a senha novamente"
+                  className="bg-white"
+                  required
+                />
+                <FieldError message={fieldErrors.confirmarSenha} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label className="text-primary-700 font-semibold text-sm">
+                  Tipo de usuario
+                </Label>
+                <Input
+                  value="Colaborador"
+                  className="bg-white"
+                  readOnly
                 />
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="situacao" className="text-primary-700 font-semibold text-sm">
-                  Situação
+                  Situacao
                 </Label>
                 <select
                   id="situacao"
@@ -200,11 +309,16 @@ export default function AdicionarColaborador() {
                 </Label>
                 <Input
                   id="dataContratacao"
-                  type="date"
+                  type="text"
                   value={form.dataContratacao}
                   onChange={(e) => handleFieldChange("dataContratacao", e.target.value)}
+                  inputMode="numeric"
+                  maxLength={10}
+                  placeholder={DATE_INPUT_PLACEHOLDER}
                   className="bg-white"
+                  required
                 />
+                <FieldError message={fieldErrors.dataContratacao} />
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="dataRegistro" className="text-primary-700 font-semibold text-sm">
@@ -212,22 +326,272 @@ export default function AdicionarColaborador() {
                 </Label>
                 <Input
                   id="dataRegistro"
-                  type="date"
+                  type="text"
                   value={form.dataRegistro}
                   onChange={(e) => handleFieldChange("dataRegistro", e.target.value)}
+                  inputMode="numeric"
+                  maxLength={10}
+                  placeholder={DATE_INPUT_PLACEHOLDER}
                   className="bg-white"
+                  required
                 />
+                <FieldError message={fieldErrors.dataRegistro} />
               </div>
             </div>
           </Card>
 
-          <div className="flex justify-end">
-            <Button className="bg-primary text-white px-8" onPress={handleSave}>
-              Salvar
+          {errorMessage && (
+            <p className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
+              {errorMessage}
+            </p>
+          )}
+
+          <div className="flex flex-col items-end gap-2">
+            {errorMessage && (
+              <p className="text-sm font-semibold text-red-600">
+                {errorMessage}
+              </p>
+            )}
+            <Button
+              type="submit"
+              className="bg-primary text-white px-8"
+              isDisabled={isLoading}
+            >
+              {isLoading ? "Salvando..." : "Salvar"}
             </Button>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );
+}
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) {
+    return null;
+  }
+
+  return <p className="text-xs font-semibold text-red-600">{message}</p>;
+}
+
+function PasswordRequirements({ password }: { password: string }) {
+  const requirements = getPasswordRequirements(password);
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-3 text-xs">
+      <p className="mb-2 font-semibold text-neutral-700">Requisitos da senha</p>
+      <div className="grid gap-1">
+        {requirements.map((requirement) => (
+          <span
+            key={requirement.label}
+            className={requirement.valid ? "text-green-700" : "text-red-600"}
+          >
+            {requirement.valid ? "✓" : "x"} {requirement.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type CollaboratorForm = {
+  nome: string;
+  sobrenome: string;
+  cpf: string;
+  email: string;
+  telefone: string;
+  senha: string;
+  confirmarSenha: string;
+  situacao: string;
+  dataContratacao: string;
+  dataRegistro: string;
+};
+
+function validateCollaboratorForm(form: CollaboratorForm, requirePassword: boolean) {
+  const errors: Record<string, string> = {};
+
+  if (!form.nome.trim()) {
+    errors.nome = "Informe o nome.";
+  }
+
+  if (!form.sobrenome.trim()) {
+    errors.sobrenome = "Informe o sobrenome.";
+  }
+
+  if (!isValidEmail(form.email)) {
+    errors.email = "Informe um e-mail valido.";
+  }
+
+  if (!isValidCpf(form.cpf)) {
+    errors.cpf = "Informe um CPF valido.";
+  }
+
+  if (!isValidPhone(form.telefone)) {
+    errors.telefone = "Informe um telefone com 10 ou 11 digitos.";
+  }
+
+  if (!form.dataRegistro) {
+    errors.dataRegistro = "Informe a data de registro.";
+  } else if (!isCompleteDateValue(form.dataRegistro) || !parseDateValue(form.dataRegistro)) {
+    errors.dataRegistro = "Informe uma data de registro valida.";
+  }
+
+  if (!form.dataContratacao) {
+    errors.dataContratacao = "Informe a data de contratacao.";
+  } else {
+    const hireDateError = validateHireDate(form.dataContratacao, form.dataRegistro);
+
+    if (hireDateError) {
+      errors.dataContratacao = hireDateError;
+    }
+  }
+
+  if (requirePassword || form.senha || form.confirmarSenha) {
+    if (!isValidPassword(form.senha)) {
+      errors.senha = "A senha nao atende aos requisitos minimos.";
+    }
+
+    if (form.senha !== form.confirmarSenha) {
+      errors.confirmarSenha = "As senhas nao conferem.";
+    }
+  }
+
+  return errors;
+}
+
+function getPasswordRequirements(password: string) {
+  return [
+    { label: "Minimo de 8 caracteres", valid: password.length >= 8 },
+    { label: "Uma letra maiuscula", valid: /[A-Z]/.test(password) },
+    { label: "Uma letra minuscula", valid: /[a-z]/.test(password) },
+    { label: "Um numero", valid: /\d/.test(password) },
+  ];
+}
+
+function isValidPassword(password: string) {
+  return getPasswordRequirements(password).every((requirement) => requirement.valid);
+}
+
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function isValidPhone(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  return digits.length === 10 || digits.length === 11;
+}
+
+function validateHireDate(hireDateValue: string, registrationDateValue: string) {
+  const hireDate = parseDateValue(hireDateValue);
+  const registrationDate = parseDateValue(registrationDateValue);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const thirtyYearsAgo = new Date(today);
+  thirtyYearsAgo.setFullYear(today.getFullYear() - 30);
+
+  if (!isCompleteDateValue(hireDateValue) || !hireDate) {
+    return "Informe uma data de contratacao valida.";
+  }
+
+  if (registrationDate && hireDate < registrationDate) {
+    return "A data de contratacao nao pode ser anterior a data de registro.";
+  }
+
+  if (hireDate < thirtyYearsAgo) {
+    return "A data de contratacao nao pode ser inferior a 30 anos.";
+  }
+
+  if (hireDate > today) {
+    return "A data de contratacao nao pode ser superior ao dia de hoje.";
+  }
+
+  return "";
+}
+
+function isValidCpf(cpf: string) {
+  const digits = cpf.replace(/\D/g, "");
+
+  if (digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) {
+    return false;
+  }
+
+  const calculateDigit = (base: string, weight: number) => {
+    const sum = base
+      .split("")
+      .reduce((total, digit, index) => total + Number(digit) * (weight - index), 0);
+    const remainder = (sum * 10) % 11;
+    return remainder === 10 ? 0 : remainder;
+  };
+
+  const firstDigit = calculateDigit(digits.slice(0, 9), 10);
+  const secondDigit = calculateDigit(`${digits.slice(0, 9)}${firstDigit}`, 11);
+
+  return firstDigit === Number(digits[9]) && secondDigit === Number(digits[10]);
+}
+
+function formatCpf(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+
+  return digits
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+}
+
+function mapApiErrorsToCollaboratorForm(apiErrors: Record<string, string>) {
+  const fieldMap: Record<string, keyof CollaboratorForm> = {
+    name: "nome",
+    lastName: "sobrenome",
+    cpf: "cpf",
+    email: "email",
+    phone: "telefone",
+    passWord: "senha",
+    hireDate: "dataContratacao",
+    registrationDate: "dataRegistro",
+  };
+
+  return Object.entries(apiErrors).reduce<Record<string, string>>(
+    (formErrors, [apiField, message]) => {
+      const formField = fieldMap[apiField];
+
+      if (formField) {
+        formErrors[formField] = normalizeApiErrorMessage(message);
+      }
+
+      return formErrors;
+    },
+    {},
+  );
+}
+
+function normalizeApiErrorMessage(message: string) {
+  if (message.includes("Ja existe uma conta")) {
+    return "Ja existe uma conta cadastrada com esse e-mail.";
+  }
+
+  if (message.includes("CPF invalido")) {
+    return "Informe um CPF valido.";
+  }
+
+  if (message.includes("Telefone")) {
+    return "Informe um telefone com 10 ou 11 digitos.";
+  }
+
+  if (message.includes("Senha")) {
+    return "A senha nao atende aos requisitos minimos.";
+  }
+
+  return message;
+}
+
+function getCreateCollaboratorErrorMessage(message: string) {
+  if (message.includes("Manager not found")) {
+    return "Faca login como gestor para cadastrar colaboradores.";
+  }
+
+  if (message.includes("Email already registered")) {
+    return "Ja existe uma conta cadastrada com esse e-mail.";
+  }
+
+  return "Nao foi possivel cadastrar o usuario. Confira os dados.";
 }

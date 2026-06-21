@@ -1,5 +1,6 @@
 package com.avaliacao.api.controller;
 
+import com.avaliacao.api.dtos.TrainingImageRecordDTO;
 import com.avaliacao.api.dtos.TrainingRecordDTO;
 import com.avaliacao.api.models.TrainingModel;
 import com.avaliacao.api.models.UserModel;
@@ -41,12 +42,18 @@ public class TrainingController {
 
     // Implementação do metodo Post
     @PostMapping
-    public ResponseEntity<TrainingModel> CreateTraining(
+    public ResponseEntity<Object> CreateTraining(
             @RequestBody @Valid TrainingRecordDTO trainingRecordDTO){
 
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(trainingService.create(trainingRecordDTO));
+        try {
+            return ResponseEntity
+                    .status(HttpStatus.CREATED)
+                    .body(trainingService.create(trainingRecordDTO));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body(exception.getMessage());
+        }
     }
 
     // implementação do méto do GetALL
@@ -56,6 +63,37 @@ public class TrainingController {
         return ResponseEntity
                 .status(HttpStatus.OK)
                 .body(trainingService.findAll());
+    }
+
+    @GetMapping("/managers/{managerId}")
+    public ResponseEntity<Object> getTrainingsByManager(
+            @PathVariable(value = "managerId") UUID managerId){
+
+        try {
+            return ResponseEntity
+                    .status(HttpStatus.OK)
+                    .body(trainingService.findByManager(managerId));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body(exception.getMessage());
+        }
+    }
+
+    @PostMapping("/managers/{managerId}")
+    public ResponseEntity<Object> createTrainingForManager(
+            @PathVariable(value = "managerId") UUID managerId,
+            @RequestBody @Valid TrainingRecordDTO trainingRecordDTO){
+
+        try {
+            return ResponseEntity
+                    .status(HttpStatus.CREATED)
+                    .body(trainingService.createForManager(managerId, trainingRecordDTO));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body(exception.getMessage());
+        }
     }
 
     // GetOne -> Pegar um único recurs específico
@@ -79,8 +117,15 @@ public class TrainingController {
     public ResponseEntity<Object> updateTrainig(@PathVariable(value = "id") UUID id,
                                                 @RequestBody @Valid TrainingRecordDTO trainingRecordDTO){
 
-        Optional<TrainingModel> tainingO = trainingService
-                .update(id,trainingRecordDTO);
+        Optional<TrainingModel> tainingO;
+
+        try {
+            tainingO = trainingService.update(id,trainingRecordDTO);
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body(exception.getMessage());
+        }
 
         if(tainingO.isEmpty()){
             return ResponseEntity
@@ -90,6 +135,23 @@ public class TrainingController {
         return ResponseEntity
                 .status(HttpStatus.OK)
                 .body(tainingO.get());
+    }
+
+    @PutMapping("/{id}/image")
+    public ResponseEntity<Object> updateTrainingImage(@PathVariable(value = "id") UUID id,
+                                                      @RequestBody @Valid TrainingImageRecordDTO trainingImageRecordDTO){
+
+        Optional<TrainingModel> trainingO = trainingService.updateImage(id,trainingImageRecordDTO);
+
+        if(trainingO.isEmpty()){
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body("Training not found.");
+        }
+
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(trainingO.get());
     }
 
 
@@ -130,7 +192,15 @@ public class TrainingController {
             @PathVariable(value = "trainingId") UUID trainingId,
             @PathVariable(value = "userId") UUID userId){
 
-        Optional<TrainingModel> trainingO = trainingService.removeUser(trainingId,userId);
+        Optional<TrainingModel> trainingO;
+
+        try {
+            trainingO = trainingService.removeUser(trainingId,userId);
+        } catch (IllegalStateException exception) {
+            return ResponseEntity
+                    .status(HttpStatus.CONFLICT)
+                    .body(exception.getMessage());
+        }
 
         if(trainingO.isEmpty()){
             return ResponseEntity
