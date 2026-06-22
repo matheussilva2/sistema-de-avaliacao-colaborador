@@ -16,6 +16,7 @@ import TreinamentoDetalhes from "./pages/Gerenciar-Treinamentos/Treinamento-Deta
 import AdicionarAluno from "./pages/Gerenciar-Treinamentos/AdicionarAluno";
 import CriarTreinamento from "./pages/Gerenciar-Treinamentos/Novo-Treinamento";
 import FormulariosTreinamento from "./pages/Gerenciar-Treinamentos/Formularios-Treinamento";
+import AcompanhamentoFormulario from "./pages/Gerenciar-Treinamentos/Acompanhamento-Formulario";
 import TreinamentoAluno from "./pages/Treinamentos/Treinamento-Detalhe";
 import TreinamentoExecucao from "./pages/Treinamentos/Treinamento-Execucao";
 import TreinamentoResultados from "./pages/Treinamentos/Treinamento-Resultados";
@@ -55,6 +56,10 @@ function App() {
               element={<FormulariosTreinamento />}
             />
             <Route path="gerenciar-treinamentos/:id/adicionar-alunos" element={<AdicionarAluno />} />
+            <Route
+              path="gerenciar-treinamentos/:id/formularios/:formId/acompanhamento"
+              element={<AcompanhamentoFormulario />}
+            />
             <Route
               path="gerenciar-treinamentos/:id/formularios"
               element={<FormulariosTreinamento />}

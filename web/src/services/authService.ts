@@ -17,7 +17,7 @@ export class ApiRequestError extends Error {
   }
 }
 
-export type ApiUserRole = "MANAGER" | "EMPLOYEE";
+export type ApiUserRole = "ADMIN" | "MANAGER" | "EMPLOYEE";
 
 export type ApiUser = {
   id: string;
@@ -85,7 +85,11 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
 }
 
 export function mapUserRoleToCargo(userRole: ApiUserRole): Cargo {
-  return userRole === "MANAGER" ? "gerenciador" : "colaborador";
+  return userRole === "EMPLOYEE" ? "colaborador" : "gerenciador";
+}
+
+export function isManagerOrAdmin(user?: ApiUser | null) {
+  return user?.userRole === "MANAGER" || user?.userRole === "ADMIN";
 }
 
 function getPermissionsByRole(cargo: Cargo) {
