@@ -435,6 +435,22 @@ async function buildManagerTrainingsBreadcrumbs(
   }
 
   if (action === "formularios") {
+    const pathFormId = segments[4];
+
+    if (pathFormId && segments[5] === "acompanhamento") {
+      const formName = await getFormName(pathFormId);
+
+      return [
+        ...list,
+        { label: trainingName, path: trainingPath },
+        {
+          label: formName,
+          path: `${trainingPath}/formularios?formId=${pathFormId}`,
+        },
+        { label: "Acompanhamento", path: pathname },
+      ];
+    }
+
     const params = new URLSearchParams(search);
     const formId = params.get("formId");
     const isNewForm = params.get("acao") === "novo";

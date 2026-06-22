@@ -1,5 +1,5 @@
 import { Card, Button, Input, Label, Skeleton } from "@heroui/react";
-import { ChevronDown, ChevronUp, Trash2, Undo2 } from "lucide-react";
+import { BarChart3, ChevronDown, ChevronUp, FilePenLine, Trash2, Undo2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import TrainingAnalyticsCharts, {
   type StudentTrainingAnalytics,
@@ -551,6 +551,11 @@ export default function TreinamentoDetalhes() {
                   `/painel/gerenciar-treinamentos/${training.idTraining}/formularios?formId=${formId}`,
                 )
               }
+              onOpenDashboard={(formId) =>
+                navigate(
+                  `/painel/gerenciar-treinamentos/${training.idTraining}/formularios/${formId}/acompanhamento`,
+                )
+              }
               trashedForms={trashedForms}
               onRestore={handleRestoreForm}
               onDeleteForever={handleDeleteFormForever}
@@ -799,6 +804,7 @@ function LinkedStudentCard({
 type FormListGroupProps = {
   forms: TrainingFormSummary[];
   onOpen: (formId: string) => void;
+  onOpenDashboard: (formId: string) => void;
   trashedForms: TrashedForm[];
   onRestore: (formId: string) => void;
   onDeleteForever: (formId: string) => void;
@@ -808,6 +814,7 @@ type FormListGroupProps = {
 function FormListGroup({
   forms,
   onOpen,
+  onOpenDashboard,
   trashedForms,
   onRestore,
   onDeleteForever,
@@ -825,11 +832,9 @@ function FormListGroup({
 
         <div className="flex flex-col gap-3">
           {forms.map((form) => (
-            <button
+            <div
               key={form.idForm}
-              type="button"
-              onClick={() => onOpen(form.idForm)}
-              className="rounded-md bg-white p-4 text-left shadow-sm transition hover:border-primary hover:shadow-md"
+              className="rounded-md bg-white p-4 shadow-sm transition hover:border-primary hover:shadow-md"
             >
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div>
@@ -863,7 +868,24 @@ function FormListGroup({
                   </p>
                 </div>
               </div>
-            </button>
+
+              <div className="mt-4 flex flex-wrap justify-end gap-2">
+                <Button
+                  className="bg-white text-primary border border-primary"
+                  onPress={() => onOpen(form.idForm)}
+                >
+                  <FilePenLine size={16} />
+                  Editar
+                </Button>
+                <Button
+                  className="bg-primary text-white"
+                  onPress={() => onOpenDashboard(form.idForm)}
+                >
+                  <BarChart3 size={16} />
+                  Acompanhamento
+                </Button>
+              </div>
+            </div>
           ))}
 
           {forms.length === 0 && (

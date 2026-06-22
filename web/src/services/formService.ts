@@ -181,6 +181,12 @@ export function getTrainingResults(trainingId: string) {
   });
 }
 
+export function getFormResults(formId: string) {
+  return request<ApiFormAnswer[]>(`/results/forms/${formId}`, {
+    method: "GET",
+  });
+}
+
 export function getTrainingUserResults(trainingId: string, userId: string) {
   return request<ApiFormAnswer[]>(`/results/trainings/${trainingId}/users/${userId}`, {
     method: "GET",
