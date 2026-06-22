@@ -5,11 +5,13 @@ import { getTrainingById, type ApiTraining } from "../../../services/trainingSer
 import { ApiRequestError, getAuthenticatedUser } from "../../../services/authService";
 import {
   createFormAnswer,
+  getFormById,
   getFormUserAnswers,
-  getFormWithQuestions,
+  startFormAttempt,
+  type ApiForm,
+  type ApiFormAttempt,
   type ApiFormAnswer,
   type ApiFormType,
-  type ApiFormWithQuestions,
 } from "../../../services/formService";
 import {
   formatDateTimeForDisplay,
@@ -20,7 +22,7 @@ export default function TreinamentoExecucao() {
   const { id, formId } = useParams();
   const navigate = useNavigate();
   const [training, setTraining] = useState<ApiTraining | null>(null);
-  const [form, setForm] = useState<ApiFormWithQuestions | null>(null);
+  const [form, setForm] = useState<ApiFormAttempt | null>(null);
   const [submittedAnswer, setSubmittedAnswer] = useState<ApiFormAnswer | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -44,7 +46,7 @@ export default function TreinamentoExecucao() {
       }
 
       try {
-        const formData = await getFormWithQuestions(formId);
+        const baseForm = await getFormById(formId);
 
         let answer: ApiFormAnswer | null = null;
         let trainingData: ApiTraining | null = null;
@@ -62,6 +64,17 @@ export default function TreinamentoExecucao() {
           answer = null;
         }
 
+        const formAvailabilityStatus = getAvailabilityStatus(
+          baseForm.initDate,
+          baseForm.initTime,
+          baseForm.endDate,
+          baseForm.endTime,
+        );
+        const shouldStartAttempt = Boolean(answer) || formAvailabilityStatus === "available";
+        const formData = shouldStartAttempt
+          ? await startFormAttempt(formId, currentUser.id)
+          : buildUnavailableFormAttempt(baseForm);
+
         setTraining(trainingData);
         setForm(formData);
         setSubmittedAnswer(answer);
@@ -78,8 +91,13 @@ export default function TreinamentoExecucao() {
 
           setAnswers(selectedAnswers);
         }
-      } catch {
-        setErrorMessage("Nao foi possivel carregar o formulario.");
+      } catch (error) {
+        if (error instanceof ApiRequestError) {
+          const apiMessage = Object.values(error.fieldErrors).at(0);
+          setErrorMessage(apiMessage || "Nao foi possivel carregar o formulario.");
+        } else {
+          setErrorMessage("Nao foi possivel carregar o formulario.");
+        }
       } finally {
         setIsLoading(false);
       }
@@ -133,9 +151,14 @@ export default function TreinamentoExecucao() {
       });
 
       setSubmittedAnswer(savedAnswer);
+      setForm(await startFormAttempt(form.idForm, currentUser.id));
     } catch (error) {
       if (error instanceof ApiRequestError && error.fieldErrors.availability) {
         setErrorMessage(error.fieldErrors.availability);
+      } else if (error instanceof ApiRequestError) {
+        setErrorMessage(
+          Object.values(error.fieldErrors).at(0) || "Nao foi possivel enviar as respostas.",
+        );
       } else {
         setErrorMessage("Nao foi possivel enviar as respostas.");
       }
@@ -188,7 +211,7 @@ export default function TreinamentoExecucao() {
           )}
         </div>
 
-        <div className="mt-5 grid gap-3 md:grid-cols-3">
+        <div className="mt-5 grid gap-3 md:grid-cols-4">
           <div className="rounded-md bg-primary-50 p-4">
             <p className="text-sm text-neutral-600">Inicio</p>
             <p className="font-bold text-neutral-900">
@@ -204,6 +227,14 @@ export default function TreinamentoExecucao() {
           <div className="rounded-md bg-primary-50 p-4">
             <p className="text-sm text-neutral-600">Minimo</p>
             <p className="font-bold text-neutral-900">{form.minCorrectPercentage}%</p>
+          </div>
+          <div className="rounded-md bg-primary-50 p-4">
+            <p className="text-sm text-neutral-600">Questoes</p>
+            <p className="font-bold text-neutral-900">
+              {form.questionBankSize > 0
+                ? `${form.questionsToDraw} de ${form.questionBankSize}`
+                : `${form.questionsToDraw} sorteada(s)`}
+            </p>
           </div>
         </div>
       </Card>
@@ -224,9 +255,10 @@ export default function TreinamentoExecucao() {
               {question.alternatives.map((option) => {
                 const isSelected = answers[question.idQuestion] === option.idAlternative;
                 const showCorrection = isReadOnly;
-                const isCorrectSelected = showCorrection && isSelected && option.correct;
-                const isWrongSelected = showCorrection && isSelected && !option.correct;
-                const showCorrectOption = showCorrection && option.correct && !isSelected;
+                const isCorrectOption = Boolean(option.correct);
+                const isCorrectSelected = showCorrection && isSelected && isCorrectOption;
+                const isWrongSelected = showCorrection && isSelected && !isCorrectOption;
+                const showCorrectOption = showCorrection && isCorrectOption && !isSelected;
 
                 return (
                   <label
@@ -325,6 +357,16 @@ function getAvailabilityMessage(status: ReturnType<typeof getAvailabilityStatus>
   }
 
   return "";
+}
+
+function buildUnavailableFormAttempt(form: ApiForm): ApiFormAttempt {
+  return {
+    ...form,
+    idAttempt: "",
+    questionBankSize: 0,
+    startedAt: "",
+    questions: [],
+  };
 }
 
 function FormExecutionSkeleton() {

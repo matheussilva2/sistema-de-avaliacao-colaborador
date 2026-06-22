@@ -53,6 +53,7 @@ type ManagedTrainingForm = {
   startTime: string;
   endTime: string;
   minCorrect: string;
+  questionsToDraw: string;
   questions: Question[];
 };
 
@@ -63,7 +64,8 @@ type ManagedFormField =
   | "endDeadline"
   | "startTime"
   | "endTime"
-  | "minCorrect";
+  | "minCorrect"
+  | "questionsToDraw";
 
 type ManagedFormFieldErrors = Partial<Record<ManagedFormField, string>>;
 type ManagedFormValidationErrors = ManagedFormFieldErrors & {
@@ -102,6 +104,7 @@ const createEmptyForm = (
   startTime: DEFAULT_START_TIME,
   endTime: DEFAULT_END_TIME,
   minCorrect: "70",
+  questionsToDraw: "1",
   questions: [],
 });
 
@@ -705,6 +708,31 @@ export default function FormulariosTreinamento() {
                   </select>
                   <FieldError message={currentFieldErrors.minCorrect} />
                 </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-neutral-700">
+                    Banco de questoes
+                  </label>
+                  <div className="rounded-md border-2 border-neutral-200 bg-neutral-50 px-3 py-3 text-sm font-semibold text-neutral-800">
+                    {form.questions.length} questao(oes) cadastrada(s)
+                  </div>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-neutral-700">
+                    Questoes sorteadas por colaborador
+                  </label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={Math.max(form.questions.length, 1)}
+                    value={form.questionsToDraw}
+                    onChange={(event) =>
+                      updateForm(form.id, "questionsToDraw", event.target.value)
+                    }
+                    readOnly={isLockedByAnswers}
+                    className={getInputClassName(Boolean(currentFieldErrors.questionsToDraw))}
+                  />
+                  <FieldError message={currentFieldErrors.questionsToDraw} />
+                </div>
               </div>
             </div>
 
@@ -953,6 +981,7 @@ async function hydrateForm(trainingId: string, form: ApiForm): Promise<ManagedTr
     startTime: formatTimeForDisplay(form.initTime) || DEFAULT_START_TIME,
     endTime: formatTimeForDisplay(form.endTime) || DEFAULT_END_TIME,
     minCorrect: String(form.minCorrectPercentage),
+    questionsToDraw: String(resolveQuestionsToDraw(form.questionsToDraw, hydratedQuestions.length)),
     questions: hydratedQuestions,
   };
 }
@@ -967,6 +996,7 @@ function mapManagedFormToApiForm(form: ManagedTrainingForm): ApiForm {
     initTime: formatTimeForDisplay(form.startTime) || DEFAULT_START_TIME,
     endTime: formatTimeForDisplay(form.endTime) || DEFAULT_END_TIME,
     minCorrectPercentage: Number(form.minCorrect),
+    questionsToDraw: Number(form.questionsToDraw),
   };
 }
 
@@ -979,7 +1009,16 @@ function buildFormPayload(form: ManagedTrainingForm) {
     initTime: formatTimeForDisplay(form.startTime),
     endTime: formatTimeForDisplay(form.endTime),
     minCorrectPercentage: Number(form.minCorrect),
+    questionsToDraw: Number(form.questionsToDraw),
   };
+}
+
+function resolveQuestionsToDraw(value: number | undefined, questionBankSize: number) {
+  if (value && value > 0) {
+    return value;
+  }
+
+  return Math.max(questionBankSize, 1);
 }
 
 function validateManagedForms(forms: ManagedTrainingForm[]) {
@@ -1001,6 +1040,7 @@ function validateManagedForm(form: ManagedTrainingForm) {
   const startTime = parseTimeValue(form.startTime);
   const endTime = parseTimeValue(form.endTime);
   const minCorrect = Number(form.minCorrect);
+  const questionsToDraw = Number(form.questionsToDraw);
 
   if (!form.title.trim()) {
     errors.title = "Informe o titulo do formulario.";
@@ -1040,6 +1080,18 @@ function validateManagedForm(form: ManagedTrainingForm) {
     errors.minCorrect = "Informe o minimo de acertos.";
   } else if (!Number.isFinite(minCorrect) || minCorrect < 0 || minCorrect > 100) {
     errors.minCorrect = "Informe um minimo de acertos entre 0 e 100.";
+  }
+
+  if (!form.questionsToDraw.trim()) {
+    errors.questionsToDraw = "Informe quantas questoes serao sorteadas.";
+  } else if (
+    !Number.isInteger(questionsToDraw) ||
+    questionsToDraw < 1
+  ) {
+    errors.questionsToDraw = "Informe uma quantidade de questoes maior que 0.";
+  } else if (form.questions.length > 0 && questionsToDraw > form.questions.length) {
+    errors.questionsToDraw =
+      "A quantidade sorteada nao pode ser maior que o banco de questoes.";
   }
 
   if (startDate && endDate && endDate < startDate) {
@@ -1270,6 +1322,7 @@ function mapApiErrorsToManagedForm(apiErrors: Record<string, string>) {
     initTime: "startTime",
     endTime: "endTime",
     minCorrectPercentage: "minCorrect",
+    questionsToDraw: "questionsToDraw",
   };
 
   return Object.entries(apiErrors).reduce<ManagedFormFieldErrors>(
@@ -1327,6 +1380,12 @@ function normalizeApiFormErrorMessage(message: string) {
     return message.includes("obrigatorio")
       ? "Informe o minimo de acertos."
       : "Informe um minimo de acertos entre 0 e 100.";
+  }
+
+  if (message.includes("Quantidade de questoes sorteadas")) {
+    return message.includes("maior que o banco")
+      ? "A quantidade sorteada nao pode ser maior que o banco de questoes."
+      : "Informe quantas questoes serao sorteadas.";
   }
 
   return message;

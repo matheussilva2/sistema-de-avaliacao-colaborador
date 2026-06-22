@@ -15,5 +15,8 @@ public record FormRecordDTO(@NotBlank(message = "Titulo e obrigatorio") String t
                             @NotNull(message = "Percentual minimo e obrigatorio")
                             @Min(value = 0, message = "Percentual minimo nao pode ser menor que 0")
                             @Max(value = 100, message = "Percentual minimo nao pode ser maior que 100")
-                            Integer minCorrectPercentage) {
+                            Integer minCorrectPercentage,
+                            @NotNull(message = "Quantidade de questoes sorteadas e obrigatoria")
+                            @Min(value = 1, message = "Quantidade de questoes sorteadas deve ser maior que 0")
+                            Integer questionsToDraw) {
 }

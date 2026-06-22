@@ -235,7 +235,16 @@ function parseFieldErrors(responseText: string) {
       return {};
     }
 
-    return Object.entries(parsed).reduce<Record<string, string>>((errors, [field, message]) => {
+    const parsedRecord = parsed as Record<string, unknown>;
+
+    if (
+      typeof parsedRecord.message === "string" &&
+      ("timestamp" in parsedRecord || "status" in parsedRecord || "error" in parsedRecord)
+    ) {
+      return { message: parsedRecord.message };
+    }
+
+    return Object.entries(parsedRecord).reduce<Record<string, string>>((errors, [field, message]) => {
       if (typeof message === "string") {
         errors[field] = message;
       }

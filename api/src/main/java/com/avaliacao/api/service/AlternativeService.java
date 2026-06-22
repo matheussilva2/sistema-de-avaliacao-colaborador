@@ -1,12 +1,14 @@
 package com.avaliacao.api.service;
 
 import com.avaliacao.api.dtos.AlternativeRecordDTO;
+import com.avaliacao.api.exceptions.FieldValidationException;
 import com.avaliacao.api.models.AlternativeModel;
 import com.avaliacao.api.repositories.AlternativeRepository;
 import com.avaliacao.api.repositories.QuestionRepository;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -16,10 +18,14 @@ public class AlternativeService {
 
     private final AlternativeRepository alternativeRepository;
     private final QuestionRepository questionRepository;
+    private final FormAttemptService formAttemptService;
 
-    public AlternativeService(AlternativeRepository alternativeRepository, QuestionRepository questionRepository){
+    public AlternativeService(AlternativeRepository alternativeRepository,
+                              QuestionRepository questionRepository,
+                              FormAttemptService formAttemptService){
         this.alternativeRepository = alternativeRepository;
         this.questionRepository = questionRepository;
+        this.formAttemptService = formAttemptService;
     }
 
     public Optional<AlternativeModel> create(UUID questionId, AlternativeRecordDTO alternativeRecordDTO){
@@ -28,6 +34,8 @@ public class AlternativeService {
         if(questionO.isEmpty()){
             return Optional.empty();
         }
+
+        ensureQuestionFormHasNoAttempts(questionO.get().getForm().getIdForm());
 
         var alternative = new AlternativeModel();
         BeanUtils.copyProperties(alternativeRecordDTO,alternative);
@@ -64,6 +72,7 @@ public class AlternativeService {
         }
 
         var alternative = alternativeO.get();
+        ensureQuestionFormHasNoAttempts(alternative.getQuestion().getForm().getIdForm());
         BeanUtils.copyProperties(alternativeRecordDTO,alternative);
         alternative.setText(alternativeRecordDTO.text().trim());
         alternative.setCorrect(alternativeRecordDTO.correct());
@@ -78,7 +87,18 @@ public class AlternativeService {
             return false;
         }
 
+        ensureQuestionFormHasNoAttempts(alternativeO.get().getQuestion().getForm().getIdForm());
         alternativeRepository.delete(alternativeO.get());
         return true;
+    }
+
+    private void ensureQuestionFormHasNoAttempts(UUID formId){
+        if(!formAttemptService.existsByForm(formId)){
+            return;
+        }
+
+        var errors = new LinkedHashMap<String, String>();
+        errors.put("formId", "Formulario ja foi iniciado por colaboradores");
+        throw new FieldValidationException(errors);
     }
 }

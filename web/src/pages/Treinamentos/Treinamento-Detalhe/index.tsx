@@ -234,7 +234,7 @@ function StudentFormCard({
           <h3 className="mt-3 text-lg font-semibold text-neutral-900">
             {form.title}
           </h3>
-          <div className="mt-4 grid gap-3 text-sm text-neutral-600 md:grid-cols-3">
+          <div className="mt-4 grid gap-3 text-sm text-neutral-600 md:grid-cols-4">
             <div>
               <span>Inicio</span>
               <p className="font-semibold text-neutral-900">
@@ -251,6 +251,12 @@ function StudentFormCard({
               <span>Minimo</span>
               <p className="font-semibold text-neutral-900">
                 {form.minCorrectPercentage}%
+              </p>
+            </div>
+            <div>
+              <span>Questoes</span>
+              <p className="font-semibold text-neutral-900">
+                {form.questionsToDraw} sorteada(s)
               </p>
             </div>
           </div>

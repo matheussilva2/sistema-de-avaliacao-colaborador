@@ -34,17 +34,20 @@ public class FormService {
     private final QuestionRepository questionRepository;
     private final AlternativeRepository alternativeRepository;
     private final FormAnswerRepository formAnswerRepository;
+    private final FormAttemptService formAttemptService;
 
     public FormService(FormRepository formRepository,
                        TrainingRepository trainingRepository,
                        QuestionRepository questionRepository,
                        AlternativeRepository alternativeRepository,
-                       FormAnswerRepository formAnswerRepository){
+                       FormAnswerRepository formAnswerRepository,
+                       FormAttemptService formAttemptService){
         this.formRepository = formRepository;
         this.trainingRepository = trainingRepository;
         this.questionRepository = questionRepository;
         this.alternativeRepository = alternativeRepository;
         this.formAnswerRepository = formAnswerRepository;
+        this.formAttemptService = formAttemptService;
     }
 
     public Optional<FormModel> create(UUID trainingId, FormRecordDTO formRecordDTO){
@@ -89,10 +92,11 @@ public class FormService {
             return Optional.empty();
         }
 
-        ensureFormHasNoAnswers(id);
+        ensureFormIsEditable(id);
 
         var form = formO.get();
         validateForm(formRecordDTO);
+        validateQuestionDrawLimit(id,formRecordDTO.questionsToDraw());
         BeanUtils.copyProperties(formRecordDTO,form);
         applyNormalizedFields(form, formRecordDTO);
 
@@ -107,7 +111,7 @@ public class FormService {
             return false;
         }
 
-        ensureFormHasNoAnswers(id);
+        ensureFormIsEditable(id);
 
         var questions = questionRepository.findByFormIdForm(id);
 
@@ -124,14 +128,20 @@ public class FormService {
         return true;
     }
 
-    private void ensureFormHasNoAnswers(UUID formId){
-        if(!formAnswerRepository.existsByFormIdForm(formId)){
-            return;
+    private void ensureFormIsEditable(UUID formId){
+        var errors = new LinkedHashMap<String, String>();
+
+        if(formAnswerRepository.existsByFormIdForm(formId)){
+            errors.put("formId", "Formulario ja tem respostas cadastradas");
         }
 
-        var errors = new LinkedHashMap<String, String>();
-        errors.put("formId", "Formulario ja tem respostas cadastradas");
-        throw new FieldValidationException(errors);
+        if(formAttemptService.existsByForm(formId)){
+            errors.put("formId", "Formulario ja foi iniciado por colaboradores");
+        }
+
+        if(!errors.isEmpty()){
+            throw new FieldValidationException(errors);
+        }
     }
 
     private void validateForm(FormRecordDTO formRecordDTO){
@@ -157,6 +167,12 @@ public class FormService {
             errors.put("endTime", "Horario de termino invalido");
         }
 
+        if(formRecordDTO.questionsToDraw() == null){
+            errors.put("questionsToDraw", "Quantidade de questoes sorteadas e obrigatoria");
+        } else if(formRecordDTO.questionsToDraw() < 1){
+            errors.put("questionsToDraw", "Quantidade de questoes sorteadas deve ser maior que 0");
+        }
+
         if(initDate != null && endDate != null && endDate.isBefore(initDate)){
             errors.put("endDate", "Data de termino deve ser posterior ou igual a data de inicio");
         }
@@ -174,12 +190,31 @@ public class FormService {
         }
     }
 
+    private void validateQuestionDrawLimit(UUID formId, Integer questionsToDraw){
+        if(questionsToDraw == null){
+            return;
+        }
+
+        int questionBankSize = questionRepository.findByFormIdForm(formId).size();
+
+        if(questionBankSize == 0 || questionsToDraw <= questionBankSize){
+            return;
+        }
+
+        var errors = new LinkedHashMap<String, String>();
+        errors.put(
+                "questionsToDraw",
+                "Quantidade de questoes sorteadas nao pode ser maior que o banco de questoes");
+        throw new FieldValidationException(errors);
+    }
+
     private void applyNormalizedFields(FormModel form, FormRecordDTO formRecordDTO){
         form.setTitle(formRecordDTO.title().trim());
         form.setInitDate(normalizeDate(formRecordDTO.initDate()));
         form.setEndDate(normalizeDate(formRecordDTO.endDate()));
         form.setInitTime(normalizeTime(formRecordDTO.initTime()));
         form.setEndTime(normalizeTime(formRecordDTO.endTime()));
+        form.setQuestionsToDraw(formRecordDTO.questionsToDraw());
     }
 
     private String normalizeDate(String value){

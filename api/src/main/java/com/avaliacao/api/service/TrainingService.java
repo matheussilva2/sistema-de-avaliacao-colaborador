@@ -7,6 +7,7 @@ import com.avaliacao.api.exceptions.FieldValidationException;
 import com.avaliacao.api.models.TrainingModel;
 import com.avaliacao.api.models.UserModel;
 import com.avaliacao.api.repositories.FormAnswerRepository;
+import com.avaliacao.api.repositories.FormAttemptRepository;
 import com.avaliacao.api.repositories.TrainingRepository;
 import com.avaliacao.api.repositories.UserRepository;
 import jakarta.transaction.Transactional;
@@ -31,13 +32,16 @@ public class TrainingService {
     private final TrainingRepository trainingRepository;
     private final UserRepository userRepository;
     private final FormAnswerRepository formAnswerRepository;
+    private final FormAttemptRepository formAttemptRepository;
 
     public TrainingService(TrainingRepository trainingRepository,
                            UserRepository userRepository,
-                           FormAnswerRepository formAnswerRepository){
+                           FormAnswerRepository formAnswerRepository,
+                           FormAttemptRepository formAttemptRepository){
         this.trainingRepository = trainingRepository;
         this.userRepository = userRepository;
         this.formAnswerRepository = formAnswerRepository;
+        this.formAttemptRepository = formAttemptRepository;
     }
 
     public TrainingModel create(TrainingRecordDTO trainingRecordDTO){
@@ -145,7 +149,8 @@ public class TrainingService {
 
         var training = trainingO.get();
 
-        if(formAnswerRepository.existsByFormTrainingIdTrainingAndUserId(trainingId,userId)){
+        if(formAnswerRepository.existsByFormTrainingIdTrainingAndUserId(trainingId,userId) ||
+                formAttemptRepository.existsByFormTrainingIdTrainingAndUserId(trainingId,userId)){
             var errors = new LinkedHashMap<String, String>();
             errors.put("userId", "Colaborador ja iniciou o treinamento");
             throw new FieldValidationException(errors);

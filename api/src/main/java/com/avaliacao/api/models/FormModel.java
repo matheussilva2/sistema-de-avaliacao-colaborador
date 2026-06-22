@@ -26,6 +26,7 @@ public class FormModel implements Serializable {
     private String initTime;
     private String endTime;
     private int minCorrectPercentage;
+    private int questionsToDraw;
 
     @JsonIgnore
     @ManyToOne
@@ -94,6 +95,14 @@ public class FormModel implements Serializable {
 
     public void setMinCorrectPercentage(int minCorrectPercentage) {
         this.minCorrectPercentage = minCorrectPercentage;
+    }
+
+    public int getQuestionsToDraw() {
+        return questionsToDraw;
+    }
+
+    public void setQuestionsToDraw(int questionsToDraw) {
+        this.questionsToDraw = questionsToDraw;
     }
 
     public TrainingModel getTraining() {

@@ -11,6 +11,7 @@ export type ApiForm = {
   initTime?: string | null;
   endTime?: string | null;
   minCorrectPercentage: number;
+  questionsToDraw: number;
 };
 
 export type ApiQuestion = {
@@ -24,12 +25,29 @@ export type ApiAlternative = {
   correct: boolean;
 };
 
+export type ApiAttemptAlternative = {
+  idAlternative: string;
+  text: string;
+  correct: boolean | null;
+};
+
 export type ApiQuestionWithAlternatives = ApiQuestion & {
   alternatives: ApiAlternative[];
 };
 
 export type ApiFormWithQuestions = ApiForm & {
   questions: ApiQuestionWithAlternatives[];
+};
+
+export type ApiAttemptQuestionWithAlternatives = ApiQuestion & {
+  alternatives: ApiAttemptAlternative[];
+};
+
+export type ApiFormAttempt = ApiForm & {
+  idAttempt: string;
+  questionBankSize: number;
+  startedAt: string;
+  questions: ApiAttemptQuestionWithAlternatives[];
 };
 
 export type ApiQuestionAnswer = {
@@ -59,6 +77,7 @@ export type FormPayload = {
   initTime: string;
   endTime: string;
   minCorrectPercentage: number;
+  questionsToDraw: number;
 };
 
 export type FormAnswerPayload = {
@@ -166,6 +185,12 @@ export function createFormAnswer(
   return request<ApiFormAnswer>(`/forms/${formId}/users/${userId}/answers`, {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+export function startFormAttempt(formId: string, userId: string) {
+  return request<ApiFormAttempt>(`/forms/${formId}/users/${userId}/attempt`, {
+    method: "POST",
   });
 }
 

@@ -844,11 +844,11 @@ function FormListGroup({
                   <h4 className="font-semibold text-neutral-900">{form.title}</h4>
                 </div>
                 <span className="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary">
-                  {form.questionCount} perguntas
+                  {form.questionCount} no banco
                 </span>
               </div>
 
-              <div className="grid grid-cols-3 gap-3 text-sm text-neutral-600">
+              <div className="grid grid-cols-4 gap-3 text-sm text-neutral-600">
                 <div>
                   <span>Inicio</span>
                   <p className="font-semibold text-neutral-900">
@@ -865,6 +865,12 @@ function FormListGroup({
                   <span>Minimo</span>
                   <p className="font-semibold text-neutral-900">
                     {form.minCorrectPercentage}%
+                  </p>
+                </div>
+                <div>
+                  <span>Sorteadas</span>
+                  <p className="font-semibold text-neutral-900">
+                    {form.questionsToDraw}
                   </p>
                 </div>
               </div>

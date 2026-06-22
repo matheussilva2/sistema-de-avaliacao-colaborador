@@ -2,6 +2,7 @@ package com.avaliacao.api.service;
 
 import com.avaliacao.api.dtos.FormAnswerRecordDTO;
 import com.avaliacao.api.exceptions.FieldValidationException;
+import com.avaliacao.api.models.FormAttemptModel;
 import com.avaliacao.api.models.FormAnswerModel;
 import com.avaliacao.api.models.FormModel;
 import com.avaliacao.api.models.QuestionModel;
@@ -34,17 +35,20 @@ public class FormAnswerService {
     private final UserRepository userRepository;
     private final QuestionRepository questionRepository;
     private final AlternativeRepository alternativeRepository;
+    private final FormAttemptService formAttemptService;
 
     public FormAnswerService(FormAnswerRepository formAnswerRepository,
                              FormRepository formRepository,
                              UserRepository userRepository,
                              QuestionRepository questionRepository,
-                             AlternativeRepository alternativeRepository){
+                             AlternativeRepository alternativeRepository,
+                             FormAttemptService formAttemptService){
         this.formAnswerRepository = formAnswerRepository;
         this.formRepository = formRepository;
         this.userRepository = userRepository;
         this.questionRepository = questionRepository;
         this.alternativeRepository = alternativeRepository;
+        this.formAttemptService = formAttemptService;
     }
 
     @Transactional
@@ -58,10 +62,16 @@ public class FormAnswerService {
 
         var form = formO.get();
         var user = userO.get();
-        var formQuestions = questionRepository.findByFormIdForm(formId);
+        var attemptO = formAttemptService.findOrCreateAttempt(formId,userId);
+
+        if(attemptO.isEmpty()){
+            return Optional.empty();
+        }
+
+        var attempt = attemptO.get();
 
         validateFormAvailability(form);
-        validateAnswerReferences(formId, formAnswerRecordDTO, formQuestions);
+        validateAnswerReferences(formId, formAnswerRecordDTO, attempt);
 
         var answer = new FormAnswerModel();
 
@@ -100,7 +110,7 @@ public class FormAnswerService {
             answer.getQuestionAnswers().add(questionAnswer);
         }
 
-        int totalQuestions = formQuestions.size();
+        int totalQuestions = attempt.getQuestions().size();
         int scorePercentage = totalQuestions > 0
                 ? Math.round((correctAnswers * 100.0f) / totalQuestions)
                 : 0;
@@ -166,18 +176,26 @@ public class FormAnswerService {
     private void validateAnswerReferences(
             UUID formId,
             FormAnswerRecordDTO formAnswerRecordDTO,
-            List<QuestionModel> formQuestions){
+            FormAttemptModel attempt){
 
         var errors = new LinkedHashMap<String, String>();
 
-        if(formQuestions.isEmpty()){
-            errors.put("answers", "Formulario nao possui perguntas cadastradas");
+        if(attempt.getQuestions().isEmpty()){
+            errors.put("answers", "Tentativa nao possui perguntas sorteadas");
             throw new FieldValidationException(errors);
         }
 
-        var expectedQuestionIds = formQuestions.stream()
-                .map(QuestionModel::getIdQuestion)
+        var expectedQuestionIds = attempt.getQuestions().stream()
+                .map(attemptQuestion -> attemptQuestion.getQuestion().getIdQuestion())
                 .collect(Collectors.toSet());
+        var expectedAlternativeIdsByQuestion = attempt.getQuestions().stream()
+                .collect(Collectors.toMap(
+                        attemptQuestion -> attemptQuestion.getQuestion().getIdQuestion(),
+                        attemptQuestion -> attemptQuestion.getAlternatives().stream()
+                                .map(attemptAlternative ->
+                                        attemptAlternative.getAlternative().getIdAlternative())
+                                .collect(Collectors.toSet())
+                ));
         var answeredQuestionIds = new HashSet<UUID>();
 
         for(int index = 0; index < formAnswerRecordDTO.answers().size(); index++){
@@ -191,6 +209,10 @@ public class FormAnswerService {
                 errors.put(questionField, "Pergunta respondida mais de uma vez");
             }
 
+            if(!expectedQuestionIds.contains(questionAnswerRecordDTO.questionId())){
+                errors.put(questionField, "Pergunta nao pertence a tentativa do colaborador");
+            }
+
             if(questionO.isEmpty()){
                 errors.put(questionField, "Pergunta nao encontrada");
             } else if(!questionO.get().getForm().getIdForm().equals(formId)){
@@ -202,6 +224,14 @@ public class FormAnswerService {
             } else if(questionO.isPresent() &&
                     !alternativeO.get().getQuestion().getIdQuestion().equals(questionO.get().getIdQuestion())){
                 errors.put(alternativeField, "Alternativa nao pertence a pergunta informada");
+            } else {
+                var expectedAlternativeIds =
+                        expectedAlternativeIdsByQuestion.get(questionAnswerRecordDTO.questionId());
+
+                if(expectedAlternativeIds != null &&
+                        !expectedAlternativeIds.contains(questionAnswerRecordDTO.alternativeId())){
+                    errors.put(alternativeField, "Alternativa nao pertence a tentativa do colaborador");
+                }
             }
         }
 
